@@ -99,7 +99,7 @@ def percent_recipe_table(catalog_df, recipe_df, batch_g):
     cost_per_oz = cost_per_g * 28.3495
     cost_per_lb = cost_per_g * 453.592
     return out, batch_total, cost_per_g, cost_per_oz, cost_per_lb
-   def glaze_per_piece_from_recipe(catalog_df, recipe_df, grams_per_piece):
+    def glaze_per_piece_from_recipe(catalog_df, recipe_df, grams_per_piece):
     # price per gram from $ per lb
     price_map = {
         str(r["Material"]).strip().lower(): float(r["Cost_per_lb"]) / 453.592
