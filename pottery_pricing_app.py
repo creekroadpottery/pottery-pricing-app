@@ -258,8 +258,7 @@ try:
 except ValueError:
     ss.recipe_grams_per_piece = 0.0
     st.warning("Please enter a number")
-
-    st.metric("Glaze cost per piece from this recipe", money(cost_per_g * ss.recipe_grams_per_piece))
+st.metric("Glaze cost per piece from this recipe", money(cost_per_g * ss.recipe_grams_per_piece))
 
 # Energy
 with tabs[2]:
