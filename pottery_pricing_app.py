@@ -61,22 +61,22 @@ if "glaze_table_piece" not in ss:
 
 if "materials_catalog" not in ss:
     ss.materials_catalog = pd.DataFrame([
-        {"Material": "Custer Feldspar", "Cost_per_kg": 3.80},
-        {"Material": "Silica 325m", "Cost_per_kg": 1.80},
-        {"Material": "EPK Kaolin", "Cost_per_kg": 1.20},
-        {"Material": "Frit 3134", "Cost_per_kg": 4.50},
+        {"Material": "Sample", "Cost_per_kg": 0.00},
+        {"Material": "Sample", "Cost_per_kg": 0.00},
+        {"Material": "Sample", "Cost_per_kg": 0.00},
+        {"Material": "Sample", "Cost_per_kg": 0.00},
     ])
 
 if "recipe_percent" not in ss:
     ss.recipe_percent = pd.DataFrame([
-        {"Material": "Custer Feldspar", "Percent": 40.0},
-        {"Material": "Silica 325m", "Percent": 20.0},
-        {"Material": "EPK Kaolin", "Percent": 20.0},
-        {"Material": "Frit 3134", "Percent": 20.0},
+        {"Material": "", "Percent": 00.0},
+        {"Material": "", "Percent": 00.0},
+        {"Material": "", "Percent": 00.0},
+        {"Material": "", "Percent": 00.0},
     ])
 
 if "recipe_batch_g" not in ss:
-    ss.recipe_batch_g = 1000.0
+    ss.recipe_batch_g = 100.0
 
 if "recipe_grams_per_piece" not in ss:
     ss.recipe_grams_per_piece = 8.0
