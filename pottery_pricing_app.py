@@ -168,11 +168,22 @@ def glaze_per_piece_from_recipe(catalog_df, recipe_df, grams_per_piece):
 
 
 def calc_energy(ip):
-    e_cost = (ip["kwh_bisque"]+ip["kwh_glaze"]) * ip["kwh_rate"]
+    # electric part
+    e_cost = (ip["kwh_bisque"] + ip["kwh_glaze"]) * ip["kwh_rate"]
     e_pp = e_cost / max(1, int(ip["pieces_per_electric_firing"]))
-    g_cost = (ip["gas_units_bisque"]+ip["gas_units_glaze"]) * ip["gas_rate"]
-    g_pp = g_cost / max(1, int(ip["pieces_per_gas_firing"]))
+
+    # gas part depends on fuel_gas
+    gas_firing_cost = 0.0
+    fuel = str(ip.get("fuel_gas", "None")).strip()
+
+    if fuel == "Propane":
+        gas_firing_cost = ip["lp_price_per_gal"] * (ip["lp_gal_bisque"] + ip["lp_gal_glaze"])
+    elif fuel == "Natural Gas":
+        gas_firing_cost = ip["ng_price_per_therm"] * (ip["ng_therms_bisque"] + ip["ng_therms_glaze"])
+
+    g_pp = gas_firing_cost / max(1, int(ip["pieces_per_gas_firing"]))
     return e_pp + g_pp
+
 
 def calc_totals(ip, glaze_per_piece_cost):
     clay_cost_per_lb = ip["clay_price_per_bag"] / ip["clay_bag_weight_lb"] if ip["clay_bag_weight_lb"] else 0.0
