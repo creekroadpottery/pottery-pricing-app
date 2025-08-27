@@ -241,12 +241,26 @@ with tabs[1]:
         grams = ss.recipe_batch_g * pct / total_percent
         ppg = price_map.get(name.lower(), 0.0)
         cost = grams * ppg
-        rows.append({"Material": name, "Percent": pct, "Grams": round(grams, 2), "Cost": cost})
+        rows.append({
+            "Material": name,
+            "Percent": pct,
+            "Grams": round(grams, 2),
+            "Ounces": round(grams / 28.3495, 2),
+            "Pounds": round(grams / 453.592, 3),
+            "Cost": cost
+        })
 
     out_df = pd.DataFrame(rows)
     batch_total = float(out_df["Cost"].sum()) if not out_df.empty else 0.0
     cost_per_gram = batch_total / ss.recipe_batch_g if ss.recipe_batch_g else 0.0
     cost_per_piece = cost_per_gram * ss.recipe_grams_per_piece
+
+    # Batch size conversions
+    batch_g = float(ss.recipe_batch_g)
+    batch_oz = batch_g / 28.3495
+    batch_lb = batch_g / 453.592
+
+    st.caption(f"Batch size {batch_g:.0f} g  •  {batch_oz:.2f} oz  •  {batch_lb:.3f} lb")
 
     show_df = out_df.copy()
     show_df["Cost"] = show_df["Cost"].map(money)
@@ -256,6 +270,7 @@ with tabs[1]:
     c1.metric("Batch total", money(batch_total))
     c2.metric("Cost per gram", money(cost_per_gram))
     c3.metric("Cost per piece", money(cost_per_piece))
+
 
 # Save and load tab
 with tabs[2]:
