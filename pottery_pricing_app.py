@@ -209,10 +209,10 @@ with tabs[0]:
 # Glaze by percent tab
 with tabs[1]:
     st.subheader("Glaze cost from percent recipe")
-    st.caption("Enter material costs per pound. Enter a recipe in percents and a batch size in grams.")
+    st.caption("Recipe is fixed at 100 grams. Table shows grams oz lb for each ingredient.")
 
     ss.materials_catalog = st.data_editor(
-        df_safe(ss.materials_catalog, ["Material", "Cost_per_lbs"]),
+        df_safe(ss.materials_catalog, ["Material", "Cost_per_kg"]),
         num_rows="dynamic",
         use_container_width=True,
         key="materials_catalog_editor",
@@ -225,25 +225,29 @@ with tabs[1]:
         key="recipe_percent_editor",
     )
 
-    colA, colB = st.columns(2)
-    with colA:
-        ss.recipe_batch_g = st.number_input("Batch size in grams", min_value=1.0, value=float(ss.recipe_batch_g), step=10.0)
-    with colB:
-        ss.recipe_grams_per_piece = st.number_input("Grams used per piece", min_value=0.0, value=float(ss.recipe_grams_per_piece), step=0.5)
+    # Fixed batch size 100 g
+    batch_g = 100.0
+    grams_per_tbsp = 12.0  # not used here, kept for future
 
-    price_map = {str(r["Material"]).strip().lower(): float(r["Cost_per_kg"]) / 1000.0 for _, r in ss.materials_catalog.iterrows()}
+    # price per gram map from catalog
+    price_map = {
+        str(r["Material"]).strip().lower(): float(r["Cost_per_kg"]) / 1000.0
+        for _, r in ss.materials_catalog.iterrows()
+    }
+
+    # normalize percents
     total_percent = float(ss.recipe_percent["Percent"].sum() if "Percent" in ss.recipe_percent else 0.0) or 100.0
 
     rows = []
     for _, r in ss.recipe_percent.iterrows():
         name = str(r.get("Material", "")).strip()
         pct = float(r.get("Percent", 0.0))
-        grams = ss.recipe_batch_g * pct / total_percent
-        ppg = price_map.get(name.lower(), 0.0)
+        grams = batch_g * pct / total_percent
+        ppg = price_map.get(name.lower(), 0.0)  # price per gram
         cost = grams * ppg
         rows.append({
             "Material": name,
-            "Percent": pct,
+            "Percent": round(pct, 2),
             "Grams": round(grams, 2),
             "Ounces": round(grams / 28.3495, 2),
             "Pounds": round(grams / 453.592, 3),
@@ -251,26 +255,34 @@ with tabs[1]:
         })
 
     out_df = pd.DataFrame(rows)
-    batch_total = float(out_df["Cost"].sum()) if not out_df.empty else 0.0
-    cost_per_gram = batch_total / ss.recipe_batch_g if ss.recipe_batch_g else 0.0
-    cost_per_piece = cost_per_gram * ss.recipe_grams_per_piece
 
-    # Batch size conversions
-    batch_g = float(ss.recipe_batch_g)
+    # totals and unit conversions
+    batch_total = float(out_df["Cost"].sum()) if not out_df.empty else 0.0
     batch_oz = batch_g / 28.3495
     batch_lb = batch_g / 453.592
 
-    st.caption(f"Batch size {batch_g:.0f} g  •  {batch_oz:.2f} oz  •  {batch_lb:.3f} lb")
+    # unit costs
+    cost_per_gram = batch_total / batch_g if batch_g else 0.0
+    cost_per_oz = cost_per_gram * 28.3495
+    cost_per_lb = cost_per_gram * 453.592
 
+    # show batch summary
+    st.caption(f"Batch size 100 g  •  {batch_oz:.2f} oz  •  {batch_lb:.3f} lb")
+
+    # show table with currency formatting
     show_df = out_df.copy()
     show_df["Cost"] = show_df["Cost"].map(money)
     st.dataframe(show_df, use_container_width=True)
 
+    # metrics
     c1, c2, c3 = st.columns(3)
     c1.metric("Batch total", money(batch_total))
     c2.metric("Cost per gram", money(cost_per_gram))
-    c3.metric("Cost per piece", money(cost_per_piece))
+    c3.metric("Cost per piece", money(cost_per_gram * float(ss.recipe_grams_per_piece) if "recipe_grams_per_piece" in ss else 0.0))
 
+    c4, c5 = st.columns(2)
+    c4.metric("Cost per ounce", money(cost_per_oz))
+    c5.metric("Cost per pound", money(cost_per_lb))
 
 # Save and load tab
 with tabs[2]:
