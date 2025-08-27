@@ -251,9 +251,14 @@ with tabs[1]:
 
     col4, col5 = st.columns(2)
     col4.metric("Cost per pound", money(cost_per_lb))
-    ss.recipe_grams_per_piece = st.number_input(
-        "Grams used per piece", min_value=0.0, value=float(ss.recipe_grams_per_piece), step=0.5
-    )
+   grams_str = st.text_input("Grams used per piece", value=str(ss.recipe_grams_per_piece))
+
+try:
+    ss.recipe_grams_per_piece = float(grams_str)
+except ValueError:
+    ss.recipe_grams_per_piece = 0.0
+    st.warning("Please enter a number")
+
     st.metric("Glaze cost per piece from this recipe", money(cost_per_g * ss.recipe_grams_per_piece))
 
 # Energy
