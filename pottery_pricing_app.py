@@ -209,7 +209,8 @@ with tabs[0]:
 # Glaze by percent tab
 with tabs[1]:
     st.subheader("Glaze cost from percent recipe")
-    st.caption("Recipe is fixed at 100 grams. Table shows grams oz lb for each ingredient.")
+    st.caption("Enter recipe percents. Batch size defaults to 100 g but you can change it. "
+               "Table shows grams, ounces, and pounds for each ingredient.")
 
     ss.materials_catalog = st.data_editor(
         df_safe(ss.materials_catalog, ["Material", "Cost_per_kg"]),
@@ -225,11 +226,10 @@ with tabs[1]:
         key="recipe_percent_editor",
     )
 
-    # Fixed batch size 100 g
-    batch_g = 100.0
-    grams_per_tbsp = 12.0  # not used here, kept for future
+    # batch size input (default 100 g)
+    batch_g = st.number_input("Batch size in grams", min_value=1.0, value=100.0, step=10.0)
 
-    # price per gram map from catalog
+    # map material name to cost per gram
     price_map = {
         str(r["Material"]).strip().lower(): float(r["Cost_per_kg"]) / 1000.0
         for _, r in ss.materials_catalog.iterrows()
@@ -267,7 +267,7 @@ with tabs[1]:
     cost_per_lb = cost_per_gram * 453.592
 
     # show batch summary
-    st.caption(f"Batch size 100 g  •  {batch_oz:.2f} oz  •  {batch_lb:.3f} lb")
+    st.caption(f"Batch size {batch_g:.0f} g  •  {batch_oz:.2f} oz  •  {batch_lb:.3f} lb")
 
     # show table with currency formatting
     show_df = out_df.copy()
@@ -278,11 +278,13 @@ with tabs[1]:
     c1, c2, c3 = st.columns(3)
     c1.metric("Batch total", money(batch_total))
     c2.metric("Cost per gram", money(cost_per_gram))
-    c3.metric("Cost per piece", money(cost_per_gram * float(ss.recipe_grams_per_piece) if "recipe_grams_per_piece" in ss else 0.0))
+    c3.metric("Cost per ounce", money(cost_per_oz))
 
     c4, c5 = st.columns(2)
-    c4.metric("Cost per ounce", money(cost_per_oz))
-    c5.metric("Cost per pound", money(cost_per_lb))
+    c4.metric("Cost per pound", money(cost_per_lb))
+    c5.metric("Cost per piece (from grams per piece input)", 
+              money(cost_per_gram * float(ss.recipe_grams_per_piece) if "recipe_grams_per_piece" in ss else 0.0))
+
 
 # Save and load tab
 with tabs[2]:
