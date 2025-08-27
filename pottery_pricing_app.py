@@ -262,13 +262,9 @@ with tabs[1]:
 
     st.caption(f"Batch size {batch_g:.0f} g  •  {batch_oz:.2f} oz  •  {batch_lb:.3f} lb")
 
-    show_df = # Add weight conversions per ingredient
-out_df["Ounces"] = out_df["Grams"].apply(lambda g: round(g / 28.3495, 2))   # g to oz
-out_df["Pounds"] = out_df["Grams"].apply(lambda g: round(g / 453.592, 3))   # g to lb
-show_df = out_df.copy()
-show_df["Cost"] = show_df["Cost"].map(money)
-st.dataframe(show_df, use_container_width=True)
-
+    show_df = out_df.copy()
+    show_df["Cost"] = show_df["Cost"].map(money)
+    st.dataframe(show_df, use_container_width=True)
 
     c1, c2, c3 = st.columns(3)
     c1.metric("Batch total", money(batch_total))
