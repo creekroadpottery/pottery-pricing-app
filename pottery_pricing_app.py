@@ -99,6 +99,35 @@ def percent_recipe_table(catalog_df, recipe_df, batch_g):
     cost_per_oz = cost_per_g * 28.3495
     cost_per_lb = cost_per_g * 453.592
     return out, batch_total, cost_per_g, cost_per_oz, cost_per_lb
+    def glaze_per_piece_from_recipe(catalog_df, recipe_df, grams_per_piece):
+    # price per gram from $ per lb
+    price_map = {
+        str(r["Material"]).strip().lower(): float(r["Cost_per_lb"]) / 453.592
+        for _, r in df_safe(catalog_df, ["Material","Cost_per_lb"]).iterrows()
+    }
+    rdf = df_safe(recipe_df, ["Material","Percent"]).copy()
+    tot = float(rdf["Percent"].sum()) or 100.0
+
+    rows = []
+    total_cost_pp = 0.0
+    for _, r in rdf.iterrows():
+        name = str(r["Material"]).strip()
+        pct = float(r["Percent"])
+        g = grams_per_piece * pct / tot
+        cost_g = price_map.get(name.lower(), 0.0)
+        cost_pp = g * cost_g
+        total_cost_pp += cost_pp
+        rows.append({
+            "Material": name,
+            "Percent": round(pct, 2),
+            "Grams_per_piece": round(g, 3),
+            "Ounces_per_piece": round(g / 28.3495, 3),
+            "Pounds_per_piece": round(g / 453.592, 4),
+            "Cost_per_piece": cost_pp
+        })
+    df = pd.DataFrame(rows)
+    return df, float(total_cost_pp)
+
 
 def calc_energy(ip):
     e_cost = (ip["kwh_bisque"]+ip["kwh_glaze"]) * ip["kwh_rate"]
@@ -133,11 +162,12 @@ st.title("Pottery Cost Analysis App")
 
 tabs = st.tabs(["Per unit","Glaze recipe","Energy","Labor and overhead","Pricing","Compare","Save and load","Report","About"])
 
-# Per Unit
+# Per unit
 with tabs[0]:
     ip = ss.inputs
-    c1, c2 = st.columns(2)
-    with c1:
+    left, right = st.columns(2)
+
+    with left:
         st.subheader("Clay and packaging")
         ip["units_made"] = st.number_input("Units in this batch", min_value=1, value=int(ip["units_made"]), step=1)
         ip["clay_price_per_bag"] = st.number_input("Clay price per bag", min_value=0.0, value=float(ip["clay_price_per_bag"]), step=0.5)
@@ -146,19 +176,30 @@ with tabs[0]:
         ip["clay_yield"] = st.slider("Clay yield after trimming and loss", min_value=0.5, max_value=1.0, value=float(ip["clay_yield"]), step=0.01)
         ip["packaging_per_piece"] = st.number_input("Packaging per piece", min_value=0.0, value=float(ip["packaging_per_piece"]), step=0.1)
 
-        st.subheader("Glaze per piece table")
-        ss.glaze_piece_df = st.data_editor(
-            df_safe(ss.glaze_piece_df, ["Material","Cost_per_kg","Grams_per_piece"]),
-            num_rows="dynamic",
-            use_container_width=True,
-            key="glaze_piece_editor",
-        )
-    with c2:
-        st.subheader("Glaze cost from this table")
-        glaze_pp_cost, gdetail = glaze_cost_from_piece_table(ss.glaze_piece_df)
-        st.metric("Glaze cost per piece", money(glaze_pp_cost))
-        st.dataframe(gdetail, use_container_width=True)
+        st.subheader("Choose glaze source")
+        glaze_source = st.radio("Glaze cost comes from", ["Recipe tab", "Manual table"], index=0, horizontal=True)
 
+        if glaze_source == "Manual table":
+            st.caption("Edit grams per piece and cost per lb on the Glaze per piece table below.")
+            ss.glaze_piece_df = st.data_editor(
+                df_safe(ss.glaze_piece_df, ["Material","Cost_per_kg","Grams_per_piece"]),  # legacy column kept if you still use this view
+                num_rows="dynamic", use_container_width=True, key="glaze_piece_editor_front"
+            )
+            glaze_pp_cost, gdetail = glaze_cost_from_piece_table(ss.glaze_piece_df)
+            source_df = gdetail.copy()
+        else:
+            st.caption("Reads materials and $ per lb from the Catalog on the Glaze recipe tab.")
+            # uses recipe tab data and grams per piece input from the recipe tab
+            recipe_df, glaze_pp_cost = glaze_per_piece_from_recipe(ss.catalog_df, ss.recipe_df, ss.recipe_grams_per_piece)
+            source_df = recipe_df.copy()
+
+        # format for display
+        if "Cost_per_piece" in source_df.columns:
+            source_df["Cost_per_piece"] = source_df["Cost_per_piece"].map(money)
+        st.subheader("Glaze per piece and cost")
+        st.dataframe(source_df, use_container_width=True)
+
+    with right:
         st.subheader("Per piece totals")
         totals = calc_totals(ip, glaze_pp_cost)
         c = st.columns(3)
@@ -170,6 +211,14 @@ with tabs[0]:
         c[1].metric("Labor", money(totals["labor_pp"]))
         c[2].metric("Overhead", money(totals["oh_pp"]))
         st.metric("Total cost per piece", money(totals["total_pp"]))
+
+        st.subheader("Prices")
+        c = st.columns(3)
+        c[0].metric("Wholesale", money(totals["wholesale"]))
+        c[1].metric("Retail", money(totals["retail"]))
+        if totals["distributor"] is not None:
+            c[2].metric("Distributor", money(totals["distributor"]))
+
 
 # Glaze Recipe
 with tabs[1]:
