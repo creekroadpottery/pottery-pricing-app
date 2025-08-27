@@ -334,4 +334,4 @@ with tabs[3]:
 # About tab
 with tabs[4]:
     st.subheader("About")
-    st.write("Created for one person by Alford Wayman of Creek Road Pottery LLC, 917 Creek Road, Laceyville, PA 18623. A gift to makers, offered in the spirit of generosity, gratitude, and empathy. Open cost analysis calculator for studio potters. Share and copy freely.")
+    st.write("Created by Alford Wayman of Creek Road Pottery LLC, 917 Creek Road, Laceyville, PA, 18623. A gift to makers, offered in the spirit of generosity, gratitude, and empathy. Open cost analysis calculator for studio potters. Share and copy freely.")
