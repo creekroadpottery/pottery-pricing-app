@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import json
 
-st.set_page_config(page_title="Pottery Pricing App", layout="wide")
+st.set_page_config(page_title="Pottery Cost Analysis App", layout="wide")
 
 # Helpers
 def df_safe(df, cols):
@@ -334,4 +334,4 @@ with tabs[3]:
 # About tab
 with tabs[4]:
     st.subheader("About")
-    st.write("Created by Creek Road Pottery LLC. Open calculator for studio potters. Share and copy freely.")
+    st.write("Created for one person by Alford Wayman of Creek Road Pottery LLC, 917 Creek Road, Laceyville, PA 18623. A gift to makers, offered in the spirit of generosity, gratitude, and empathy. Open cost analysis calculator for studio potters. Share and copy freely.")
