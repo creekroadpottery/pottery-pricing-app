@@ -1,7 +1,7 @@
 
-# Pottery Pricing App
+# Pottery Cost Analysis App
 
-A simple Streamlit app for pottery cost and pricing. It calculates per piece cost, wholesale from margin, retail from multiplier, a 2 by 2 by 2 preset, energy costs, and glaze costs by grams.
+A simple Streamlit app for pottery cost analysis and pricing. It calculates per piece cost, wholesale from margin, retail from multiplier, a 2 by 2 by 2 preset, energy costs, and glaze costs by grams.
 
 ## Quick Deploy on Streamlit Cloud
 
