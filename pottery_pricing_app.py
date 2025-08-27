@@ -129,7 +129,7 @@ def calc_totals(ip, glaze_per_piece_cost):
         energy_pp=energy_pp, labor_pp=labor_pp, oh_pp=overhead_pp,
         total_pp=total_pp, wholesale=wholesale, retail=retail, distributor=distributor
     )
-st.title("Pottery Pricing App")
+st.title("Pottery Cost Analysis App")
 
 tabs = st.tabs(["Per unit","Glaze recipe","Energy","Labor and overhead","Pricing","Compare","Save and load","Report","About"])
 
