@@ -209,10 +209,10 @@ with tabs[0]:
 # Glaze by percent tab
 with tabs[1]:
     st.subheader("Glaze cost from percent recipe")
-    st.caption("Enter material costs per kilo. Enter a recipe in percents and a batch size in grams.")
+    st.caption("Enter material costs per pound. Enter a recipe in percents and a batch size in grams.")
 
     ss.materials_catalog = st.data_editor(
-        df_safe(ss.materials_catalog, ["Material", "Cost_per_kg"]),
+        df_safe(ss.materials_catalog, ["Material", "Cost_per_lbs"]),
         num_rows="dynamic",
         use_container_width=True,
         key="materials_catalog_editor",
