@@ -209,8 +209,7 @@ with tabs[0]:
 # Glaze by percent tab
 with tabs[1]:
     st.subheader("Glaze cost from percent recipe")
-    st.caption("Enter recipe percents. Batch size defaults to 100 g but you can change it. "
-               "Table shows grams, ounces, and pounds for each ingredient.")
+    st.caption("Enter material costs per kilo. Enter a recipe in percents and a batch size in grams.")
 
     ss.materials_catalog = st.data_editor(
         df_safe(ss.materials_catalog, ["Material", "Cost_per_kg"]),
@@ -226,64 +225,78 @@ with tabs[1]:
         key="recipe_percent_editor",
     )
 
-    # batch size input (default 100 g)
-    batch_g = st.number_input("Batch size in grams", min_value=1.0, value=100.0, step=10.0)
+    colA, colB = st.columns(2)
+    with colA:
+        ss.recipe_batch_g = st.number_input("Batch size in grams", min_value=1.0, value=float(ss.recipe_batch_g), step=10.0)
+    with colB:
+        ss.recipe_grams_per_piece = st.number_input("Grams used per piece", min_value=0.0, value=float(ss.recipe_grams_per_piece), step=0.5)
 
-    # map material name to cost per gram
-    price_map = {
-        str(r["Material"]).strip().lower(): float(r["Cost_per_kg"]) / 1000.0
-        for _, r in ss.materials_catalog.iterrows()
-    }
+    price_map = {str(r["Material"]).strip().lower(): float(r["Cost_per_kg"]) / 1000.0 for _, r in ss.materials_catalog.iterrows()}
+    total_percent = float(ss.recipe_percent["Percent"].sum() if "Percent" in ss.recipe_percent else 0.0) or 100.0
 
- # Batch size input with units and typing support
-colA, colB = st.columns([2, 1])
-with colA:
-    batch_value_str = st.text_input("Batch size", value="100")
-with colB:
-    batch_unit = st.selectbox("Units", ["g", "oz", "lb"], index=0)
+    rows = []
+    for _, r in ss.recipe_percent.iterrows():
+        name = str(r.get("Material", "")).strip()
+        pct = float(r.get("Percent", 0.0))
+        grams = ss.recipe_batch_g * pct / total_percent
+        ppg = price_map.get(name.lower(), 0.0)
+        cost = grams * ppg
+        rows.append({"Material": name, "Percent": pct, "Grams": round(grams, 2), "Cost": cost})
 
-def _to_float(s):
-    try:
-        return float(str(s).strip())
-    except Exception:
-        return 0.0
+    out_df = pd.DataFrame(rows)
+    batch_total = float(out_df["Cost"].sum()) if not out_df.empty else 0.0
+    cost_per_gram = batch_total / ss.recipe_batch_g if ss.recipe_batch_g else 0.0
+    cost_per_piece = cost_per_gram * ss.recipe_grams_per_piece
 
-batch_value = _to_float(batch_value_str)
-if batch_unit == "g":
-    batch_g = batch_value
-elif batch_unit == "oz":
-    batch_g = batch_value * 28.3495
-else:  # lb
-    batch_g = batch_value * 453.592
-
-if batch_g <= 0:
-    st.warning("Enter a positive batch size")
-    st.stop()
-
-
-    # unit costs
-    cost_per_gram = batch_total / batch_g if batch_g else 0.0
-    cost_per_oz = cost_per_gram * 28.3495
-    cost_per_lb = cost_per_gram * 453.592
-
-    # show batch summary
-    st.caption(f"Batch size {batch_g:.0f} g  •  {batch_oz:.2f} oz  •  {batch_lb:.3f} lb")
-
-    # show table with currency formatting
     show_df = out_df.copy()
     show_df["Cost"] = show_df["Cost"].map(money)
     st.dataframe(show_df, use_container_width=True)
 
-    # metrics
     c1, c2, c3 = st.columns(3)
     c1.metric("Batch total", money(batch_total))
     c2.metric("Cost per gram", money(cost_per_gram))
-    c3.metric("Cost per ounce", money(cost_per_oz))
+    c3.metric("Cost per piece", money(cost_per_piece))
 
-    c4, c5 = st.columns(2)
-    c4.metric("Cost per pound", money(cost_per_lb))
-    c5.metric("Cost per piece (from grams per piece input)", 
-              money(cost_per_gram * float(ss.recipe_grams_per_piece) if "recipe_grams_per_piece" in ss else 0.0))
+# Save and load tab
+with tabs[2]:
+    st.subheader("Save and load settings")
+    st.caption("Download a JSON of your inputs. Upload it later to restore.")
+
+    current_state = dict(
+        inputs=ss.inputs,
+        glaze_table_piece=df_safe(ss.glaze_table_piece, ["Material", "Cost_per_kg", "Grams_per_piece"]).to_dict(orient="list"),
+        materials_catalog=df_safe(ss.materials_catalog, ["Material", "Cost_per_kg"]).to_dict(orient="list"),
+        recipe_percent=df_safe(ss.recipe_percent, ["Material", "Percent"]).to_dict(orient="list"),
+        recipe_batch_g=ss.recipe_batch_g,
+        recipe_grams_per_piece=ss.recipe_grams_per_piece,
+    )
+
+    st.download_button("Download settings JSON", to_json_bytes(current_state), file_name="pottery_pricing_settings.json")
+
+    up = st.file_uploader("Upload settings JSON", type=["json"])
+    if up is not None:
+        try:
+            data = from_json_bytes(up.read())
+            ss.inputs.update(data.get("inputs", {}))
+
+            def dict_to_df(d, cols):
+                if not isinstance(d, dict) or not d:
+                    return pd.DataFrame(columns=cols)
+                df = pd.DataFrame(d)
+                for c in cols:
+                    if c not in df.columns:
+                        df[c] = []
+                return df[cols]
+
+            ss.glaze_table_piece = dict_to_df(data.get("glaze_table_piece", {}), ["Material", "Cost_per_kg", "Grams_per_piece"])
+            ss.materials_catalog = dict_to_df(data.get("materials_catalog", {}), ["Material", "Cost_per_kg"])
+            ss.recipe_percent = dict_to_df(data.get("recipe_percent", {}), ["Material", "Percent"])
+            ss.recipe_batch_g = float(data.get("recipe_batch_g", ss.recipe_batch_g))
+            ss.recipe_grams_per_piece = float(data.get("recipe_grams_per_piece", ss.recipe_grams_per_piece))
+            st.success("Settings loaded. Switch tabs to see them applied.")
+        except Exception as e:
+            st.error(f"Could not load. {e}")
+
 
 
 # Save and load tab
