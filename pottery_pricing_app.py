@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import json
 
-st.set_page_config(page_title="Pottery Cost Analysis App", layout="narrow")
+st.set_page_config(page_title="Pottery Cost Analysis App", layout="wide")
 
 # Helpers
 def df_safe(df, cols):
