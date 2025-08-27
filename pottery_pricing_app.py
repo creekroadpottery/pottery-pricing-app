@@ -133,7 +133,7 @@ st.title("Pottery Cost Analysis App")
 
 tabs = st.tabs(["Per unit","Glaze recipe","Energy","Labor and overhead","Pricing","Compare","Save and load","Report","About"])
 
-# Per unit
+# Per Unit
 with tabs[0]:
     ip = ss.inputs
     c1, c2 = st.columns(2)
@@ -171,7 +171,7 @@ with tabs[0]:
         c[2].metric("Overhead", money(totals["oh_pp"]))
         st.metric("Total cost per piece", money(totals["total_pp"]))
 
-# Glaze recipe
+# Glaze Recipe
 with tabs[1]:
     st.subheader("Catalog (Cost per lb)")
     ss.catalog_df = st.data_editor(
@@ -274,7 +274,7 @@ with tabs[2]:
     st.subheader("Per piece energy now")
     st.metric("Energy per piece", money(calc_energy(ip)))
 
-# Labor and overhead
+# Labor and Overhead
 with tabs[3]:
     ip = ss.inputs
     st.subheader("Labor")
@@ -321,7 +321,7 @@ with tabs[5]:
     st.write(f"App total {money(app_total)}")
     st.write(f"Excel total {money(expected)}")
     st.write(f"Difference {money(diff)}")
-# Save and load
+# Save and Load
 with tabs[6]:
     st.subheader("Save and load settings")
     state = dict(
