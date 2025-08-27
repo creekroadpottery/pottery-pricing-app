@@ -99,7 +99,37 @@ def percent_recipe_table(catalog_df, recipe_df, batch_g):
     cost_per_oz = cost_per_g * 28.3495
     cost_per_lb = cost_per_g * 453.592
     return out, batch_total, cost_per_g, cost_per_oz, cost_per_lb
-    def glaze_per_piece_from_recipe(catalog_df, recipe_df, grams_per_piece):
+   def glaze_per_piece_from_recipe(catalog_df, recipe_df, grams_per_piece):
+    # price per gram from $ per lb
+    price_map = {
+        str(r["Material"]).strip().lower(): float(r["Cost_per_lb"]) / 453.592
+        for _, r in df_safe(catalog_df, ["Material","Cost_per_lb"]).iterrows()
+    }
+
+    rdf = df_safe(recipe_df, ["Material","Percent"]).copy()
+    tot = float(rdf["Percent"].sum()) or 100.0
+
+    rows = []
+    total_cost_pp = 0.0
+    for _, r in rdf.iterrows():
+        name = str(r["Material"]).strip()
+        pct = float(r["Percent"])
+        g = grams_per_piece * pct / tot
+        cost_g = price_map.get(name.lower(), 0.0)
+        cost_pp = g * cost_g
+        total_cost_pp += cost_pp
+        rows.append({
+            "Material": name,
+            "Percent": round(pct, 2),
+            "Grams_per_piece": round(g, 3),
+            "Ounces_per_piece": round(g / 28.3495, 3),
+            "Pounds_per_piece": round(g / 453.592, 4),
+            "Cost_per_piece": cost_pp
+        })
+
+    df = pd.DataFrame(rows)
+    return df, float(total_cost_pp)
+
     # price per gram from $ per lb
     price_map = {
         str(r["Material"]).strip().lower(): float(r["Cost_per_lb"]) / 453.592
