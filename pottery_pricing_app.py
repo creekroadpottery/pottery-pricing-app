@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import json
 
-st.set_page_config(page_title="Pottery Cost Analysis App", layout="wide")
+st.set_page_config(page_title="Pottery Cost Analysis App", layout="narrow")
 
 # Helpers
 def df_safe(df, cols):
@@ -130,7 +130,7 @@ def calc_piece(ip, glaze_df):
     )
 
 # UI header and tabs
-st.title("Pottery Pricing App v0.5")
+st.title("Pottery Cost Analysis App v0.5")
 tabs = st.tabs(["Calculator", "Glaze by percent", "Save and load", "Report", "About"])
 
 # Calculator tab
