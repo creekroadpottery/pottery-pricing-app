@@ -167,7 +167,7 @@ def glaze_per_piece_from_recipe(catalog_df, recipe_df, grams_per_piece):
     return df, float(total_cost_pp)
 if "inputs.setdefault" not in ss:
 # Backfill new energy keys if missing
-for k, v in {
+  for k, v in {
     "fuel_gas": "None",
     "lp_price_per_gal": 3.50,
     "lp_gal_bisque": 0.0,
