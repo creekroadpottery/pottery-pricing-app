@@ -130,8 +130,10 @@ with tabs[0]:
 
 # ---------- About tab ----------
 with tabs[4]:
-    st.markdown("**Created by Creek Road Pottery LLC**  
-Open calculator for studio potters. Share and copy freely.")
+    st.markdown("""
+**Created by Creek Road Pottery LLC**  
+Open calculator for studio potters. Share and copy freely.
+""")
 
 # Extra session defaults for glaze percent workflow
 if "materials_catalog" not in ss:
