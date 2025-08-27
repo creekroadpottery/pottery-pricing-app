@@ -235,31 +235,31 @@ with tabs[1]:
         for _, r in ss.materials_catalog.iterrows()
     }
 
-    # normalize percents
-    total_percent = float(ss.recipe_percent["Percent"].sum() if "Percent" in ss.recipe_percent else 0.0) or 100.0
+ # Batch size input with units and typing support
+colA, colB = st.columns([2, 1])
+with colA:
+    batch_value_str = st.text_input("Batch size", value="100")
+with colB:
+    batch_unit = st.selectbox("Units", ["g", "oz", "lb"], index=0)
 
-    rows = []
-    for _, r in ss.recipe_percent.iterrows():
-        name = str(r.get("Material", "")).strip()
-        pct = float(r.get("Percent", 0.0))
-        grams = batch_g * pct / total_percent
-        ppg = price_map.get(name.lower(), 0.0)  # price per gram
-        cost = grams * ppg
-        rows.append({
-            "Material": name,
-            "Percent": round(pct, 2),
-            "Grams": round(grams, 2),
-            "Ounces": round(grams / 28.3495, 2),
-            "Pounds": round(grams / 453.592, 3),
-            "Cost": cost
-        })
+def _to_float(s):
+    try:
+        return float(str(s).strip())
+    except Exception:
+        return 0.0
 
-    out_df = pd.DataFrame(rows)
+batch_value = _to_float(batch_value_str)
+if batch_unit == "g":
+    batch_g = batch_value
+elif batch_unit == "oz":
+    batch_g = batch_value * 28.3495
+else:  # lb
+    batch_g = batch_value * 453.592
 
-    # totals and unit conversions
-    batch_total = float(out_df["Cost"].sum()) if not out_df.empty else 0.0
-    batch_oz = batch_g / 28.3495
-    batch_lb = batch_g / 453.592
+if batch_g <= 0:
+    st.warning("Enter a positive batch size")
+    st.stop()
+
 
     # unit costs
     cost_per_gram = batch_total / batch_g if batch_g else 0.0
