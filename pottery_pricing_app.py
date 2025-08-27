@@ -165,24 +165,42 @@ def glaze_per_piece_from_recipe(catalog_df, recipe_df, grams_per_piece):
         })
     df = pd.DataFrame(rows)
     return df, float(total_cost_pp)
+if "inputs.setdefault" not in ss:
+# Backfill new energy keys if missing
+for k, v in {
+    "fuel_gas": "None",
+    "lp_price_per_gal": 3.50,
+    "lp_gal_bisque": 0.0,
+    "lp_gal_glaze": 0.0,
+    "ng_price_per_therm": 1.20,
+    "ng_therms_bisque": 0.0,
+    "ng_therms_glaze": 0.0,
+    "pieces_per_gas_firing": ss.inputs.get("pieces_per_gas_firing", 40),
+}.items():
+    ss.inputs.setdefault(k, v)
 
 
 def calc_energy(ip):
-    # electric part
+    # electric
     e_cost = (ip["kwh_bisque"] + ip["kwh_glaze"]) * ip["kwh_rate"]
     e_pp = e_cost / max(1, int(ip["pieces_per_electric_firing"]))
 
-    # gas part depends on fuel_gas
+    # gas by fuel type
     gas_firing_cost = 0.0
     fuel = str(ip.get("fuel_gas", "None")).strip()
 
     if fuel == "Propane":
-        gas_firing_cost = ip["lp_price_per_gal"] * (ip["lp_gal_bisque"] + ip["lp_gal_glaze"])
+        gas_firing_cost = ip.get("lp_price_per_gal", 0.0) * (
+            ip.get("lp_gal_bisque", 0.0) + ip.get("lp_gal_glaze", 0.0)
+        )
     elif fuel == "Natural Gas":
-        gas_firing_cost = ip["ng_price_per_therm"] * (ip["ng_therms_bisque"] + ip["ng_therms_glaze"])
+        gas_firing_cost = ip.get("ng_price_per_therm", 0.0) * (
+            ip.get("ng_therms_bisque", 0.0) + ip.get("ng_therms_glaze", 0.0)
+        )
 
-    g_pp = gas_firing_cost / max(1, int(ip["pieces_per_gas_firing"]))
+    g_pp = gas_firing_cost / max(1, int(ip.get("pieces_per_gas_firing", 40)))
     return e_pp + g_pp
+
 
 
 def calc_totals(ip, glaze_per_piece_cost):
@@ -374,32 +392,54 @@ with tabs[2]:
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("Electric")
-        ip["kwh_rate"] = st.number_input("Rate per kWh", min_value=0.0, value=float(ip["kwh_rate"]), step=0.01)
-        ip["kwh_bisque"] = st.number_input("kWh per bisque", min_value=0.0, value=float(ip["kwh_bisque"]), step=1.0)
-        ip["kwh_glaze"] = st.number_input("kWh per glaze", min_value=0.0, value=float(ip["kwh_glaze"]), step=1.0)
-        ip["pieces_per_electric_firing"] = st.number_input("Pieces per electric firing", min_value=1, value=int(ip["pieces_per_electric_firing"]), step=1)
+        ip["kwh_rate"] = st.number_input("Rate per kWh", min_value=0.0, value=float(ip.get("kwh_rate", 0.0)), step=0.01)
+        ip["kwh_bisque"] = st.number_input("kWh per bisque", min_value=0.0, value=float(ip.get("kwh_bisque", 0.0)), step=1.0)
+        ip["kwh_glaze"]  = st.number_input("kWh per glaze",  min_value=0.0, value=float(ip.get("kwh_glaze", 0.0)),  step=1.0)
+        ip["pieces_per_electric_firing"] = st.number_input(
+            "Pieces per electric firing", min_value=1, value=int(ip.get("pieces_per_electric_firing", 40)), step=1
+        )
 
     with col2:
         st.subheader("Gas")
-        ip["fuel_gas"] = st.selectbox("Fuel source", ["None","Propane","Natural Gas"],
-                                      index=["None","Propane","Natural Gas"].index(str(ip.get("fuel_gas","None"))))
+        ip["fuel_gas"] = st.selectbox(
+            "Fuel source",
+            ["None", "Propane", "Natural Gas"],
+            index=["None", "Propane", "Natural Gas"].index(str(ip.get("fuel_gas", "None")))
+        )
 
         if ip["fuel_gas"] == "Propane":
-            ip["lp_price_per_gal"] = st.number_input("Propane price per gallon", min_value=0.0, value=float(ip["lp_price_per_gal"]), step=0.05)
-            ip["lp_gal_bisque"] = st.number_input("Gallons per bisque firing", min_value=0.0, value=float(ip["lp_gal_bisque"]), step=0.1)
-            ip["lp_gal_glaze"]  = st.number_input("Gallons per glaze firing",  min_value=0.0, value=float(ip["lp_gal_glaze"]),  step=0.1)
-            ip["pieces_per_gas_firing"] = st.number_input("Pieces per gas firing", min_value=1, value=int(ip["pieces_per_gas_firing"]), step=1)
+            ip["lp_price_per_gal"] = st.number_input(
+                "Propane price per gallon", min_value=0.0, value=float(ip.get("lp_price_per_gal", 3.50)), step=0.05
+            )
+            ip["lp_gal_bisque"] = st.number_input(
+                "Gallons per bisque firing", min_value=0.0, value=float(ip.get("lp_gal_bisque", 0.0)), step=0.1
+            )
+            ip["lp_gal_glaze"] = st.number_input(
+                "Gallons per glaze firing", min_value=0.0, value=float(ip.get("lp_gal_glaze", 0.0)), step=0.1
+            )
+            ip["pieces_per_gas_firing"] = st.number_input(
+                "Pieces per gas firing", min_value=1, value=int(ip.get("pieces_per_gas_firing", 40)), step=1
+            )
 
         elif ip["fuel_gas"] == "Natural Gas":
-            ip["ng_price_per_therm"] = st.number_input("Natural gas price per therm", min_value=0.0, value=float(ip["ng_price_per_therm"]), step=0.05)
-            ip["ng_therms_bisque"]  = st.number_input("Therms per bisque firing", min_value=0.0, value=float(ip["ng_therms_bisque"]), step=0.1)
-            ip["ng_therms_glaze"]   = st.number_input("Therms per glaze firing",  min_value=0.0, value=float(ip["ng_therms_glaze"]),  step=0.1)
-            ip["pieces_per_gas_firing"] = st.number_input("Pieces per gas firing", min_value=1, value=int(ip["pieces_per_gas_firing"]), step=1)
+            ip["ng_price_per_therm"] = st.number_input(
+                "Natural gas price per therm", min_value=0.0, value=float(ip.get("ng_price_per_therm", 1.20)), step=0.05
+            )
+            ip["ng_therms_bisque"] = st.number_input(
+                "Therms per bisque firing", min_value=0.0, value=float(ip.get("ng_therms_bisque", 0.0)), step=0.1
+            )
+            ip["ng_therms_glaze"] = st.number_input(
+                "Therms per glaze firing", min_value=0.0, value=float(ip.get("ng_therms_glaze", 0.0)), step=0.1
+            )
+            ip["pieces_per_gas_firing"] = st.number_input(
+                "Pieces per gas firing", min_value=1, value=int(ip.get("pieces_per_gas_firing", 40)), step=1
+            )
         else:
-            st.caption("No gas costs included. Set fuel to Propane or Natural Gas to add them.")
+            st.caption("No gas costs included. Select Propane or Natural Gas to add them.")
 
     st.subheader("Per piece energy now")
     st.metric("Energy per piece", money(calc_energy(ip)))
+
 
 
 # Labor and Overhead
