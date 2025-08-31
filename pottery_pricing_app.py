@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import json
 
-st.set_page_config(page_title="Pottery Pricing App", layout="wide")
+st.set_page_config(page_title="Pottery Cost Analysis App", layout="wide")
 
 ss = st.session_state
 
@@ -348,7 +348,7 @@ def calc_totals(ip, glaze_per_piece_cost):
         total_pp=total_pp, wholesale=wholesale, retail=retail, distributor=distributor
     )
 # UI
-st.title("Pottery Pricing App")
+st.title("Pottery Cost Analysis App")
 
 tabs = st.tabs([
     "Per unit", "Glaze recipe", "Energy", "Labor and overhead",
