@@ -635,11 +635,19 @@ with tabs[7]:
 with tabs[8]:
     st.subheader("About this app")
     st.markdown("""
-This tool mirrors a simple pottery cost sheet.
-Use it free and share it.
-Built by Creek Road Pottery.
+This app was created to help potters understand the true cost of their work.  
+It began as a simple spreadsheet and grew into something I wanted to share.  
 
-Privacy
-Your numbers stay in your browser while the app runs.
-When you save settings the app downloads a JSON file to your computer.
+The project is guided by gratitude, generosity, and empathy.  
+Gratitude for the teachers, friends, and makers who showed me the way.  
+Generosity in making the tool free for anyone who might find it useful.  
+Empathy for the many potters balancing time, resources, and creativity.  
+
+Your numbers stay private while the app runs in your browser.  
+When you save settings, a small JSON file is downloaded to your computer.  
+No data is sent anywhere else.  
+
+Alford Wayman
+Artist/Owner
+— Creek Road Pottery LLC
 """)
