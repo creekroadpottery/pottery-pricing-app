@@ -120,6 +120,11 @@ def glaze_cost_from_piece_table(df):
     gdf["Cost_per_g"] = gdf["Cost_per_lb"] / 453.592
     gdf["Cost_per_piece"] = gdf["Cost_per_g"] * gdf["Grams_per_piece"]
     return float(gdf["Cost_per_piece"].sum()), gdf
+    
+    # Make sure grams-per-piece exists in session state
+if "recipe_grams_per_piece" not in ss:
+    ss.recipe_grams_per_piece = 8.0
+
 
 
 def percent_recipe_table(catalog_df, recipe_df, batch_g):
@@ -153,12 +158,11 @@ def percent_recipe_table(catalog_df, recipe_df, batch_g):
     return out, batch_total, cost_per_g, cost_per_oz, cost_per_lb
 
 
-def glaze_per_piece_from_recipe(catalog_df, recipe_df, grams_per_piece):
-    """Break glaze recipe down to per-piece grams and cost."""
-    price_map = {
-        str(r["Material"]).strip().lower(): float(r["Cost_per_lb"]) / 453.592
-        for _, r in ensure_cols(catalog_df, {"Material": "", "Cost_per_lb": 0.0}).iterrows()
-    }
+grams_pp = float(ss.get("recipe_grams_per_piece", 8.0))
+recipe_df, glaze_pp_cost = glaze_per_piece_from_recipe(
+    ss.catalog_df, ss.recipe_df, grams_pp
+)
+
     rdf = ensure_cols(recipe_df, {"Material": "", "Percent": 0.0}).copy()
     tot = float(rdf["Percent"].sum()) or 100.0
 
