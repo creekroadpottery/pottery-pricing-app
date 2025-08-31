@@ -163,7 +163,7 @@ import streamlit as st
 import pandas as pd
 import json
 
-st.set_page_config(page_title="Pottery Pricing App", layout="wide")
+st.set_page_config(page_title="Pottery Cost Analysis App", layout="wide")
 
 ss = st.session_state
 
