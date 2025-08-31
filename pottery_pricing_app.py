@@ -2,15 +2,26 @@ import streamlit as st
 import pandas as pd
 import json
 
-st.set_page_config(page_title="Pottery Cost Analysis App", layout="wide")
+st.set_page_config(page_title="Pottery Pricing App", layout="wide")
 
-def df_safe(df, cols):
+ss = st.session_state
+
+# --- Helpers ---
+def ensure_cols(df, schema: dict):
     if df is None:
-        return pd.DataFrame(columns=cols)
-    for c in cols:
-        if c not in df.columns:
-            df[c] = 0.0
-    return df[cols].fillna(0.0)
+        df = pd.DataFrame()
+    else:
+        df = df.copy()
+    for col, default in schema.items():
+        if col not in df.columns:
+            df[col] = default
+    df = df[list(schema.keys())]
+    for col, default in schema.items():
+        if isinstance(default, str):
+            df[col] = df[col].astype(str)
+        else:
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(default).astype(float)
+    return df
 
 def money(n):
     try:
@@ -24,8 +35,8 @@ def to_json_bytes(obj):
 def from_json_bytes(b):
     return json.loads(b.decode("utf-8"))
 
-ss = st.session_state
 
+# --- Session defaults ---
 if "inputs" not in ss:
     ss.inputs = dict(
         units_made=1,
@@ -34,31 +45,25 @@ if "inputs" not in ss:
         clay_weight_per_piece_lb=1.0,
         clay_yield=0.9,
         packaging_per_piece=0.5,
-        # energy
         kwh_rate=0.15, kwh_bisque=30.0, kwh_glaze=35.0, pieces_per_electric_firing=40,
         gas_rate=2.50, gas_units_bisque=0.0, gas_units_glaze=0.0, pieces_per_gas_firing=40,
-        # labor and overhead
         labor_rate=25.0, hours_per_piece=0.25,
         overhead_per_month=500.0, pieces_per_month=200,
-        # pricing
         use_2x2x2=False, wholesale_margin_pct=50, retail_multiplier=2.2,
-        # glaze by piece
-        grams_glaze_per_piece=8.0
     )
-# fuel choice and gas details
-fuel_gas="None",                 # None  Propane  Natural Gas
-lp_price_per_gal=3.50,
-lp_gal_bisque=0.0,
-lp_gal_glaze=0.0,
-ng_price_per_therm=1.20,
-ng_therms_bisque=0.0,
-ng_therms_glaze=0.0,
 
-if "glaze_piece_df" not in ss:
-    ss.glaze_piece_df = pd.DataFrame([
-        {"Material":"Frit 3134","Cost_per_kg":4.50,"Grams_per_piece":5.0},
-        {"Material":"EPK Kaolin","Cost_per_kg":1.20,"Grams_per_piece":3.0},
-    ])
+# backfill energy keys
+for k, v in {
+    "fuel_gas": "None",
+    "lp_price_per_gal": 3.50,
+    "lp_gal_bisque": 0.0,
+    "lp_gal_glaze": 0.0,
+    "ng_price_per_therm": 1.20,
+    "ng_therms_bisque": 0.0,
+    "ng_therms_glaze": 0.0,
+    "pieces_per_gas_firing": ss.inputs.get("pieces_per_gas_firing", 40),
+}.items():
+    ss.inputs.setdefault(k, v)
 
 if "catalog_df" not in ss:
     ss.catalog_df = pd.DataFrame([
@@ -75,67 +80,25 @@ if "recipe_df" not in ss:
         {"Material":"EPK Kaolin","Percent":20.0},
         {"Material":"Frit 3134","Percent":20.0},
     ])
-def ensure_cols(df, schema: dict):
-    """
-    Make sure df has the columns in `schema` with sane defaults and types.
-    schema = {"Material": "", "Cost_per_lb": 0.0, ...}
-    Strings stay strings. Numbers become floats with default values.
-    """
-    if df is None:
-        df = pd.DataFrame()
-    else:
-        df = df.copy()
 
-    # add missing cols and order
-    for col, default in schema.items():
-        if col not in df.columns:
-            df[col] = default
-    df = df[list(schema.keys())]
-
-    # cast types
-    for col, default in schema.items():
-        if isinstance(default, str):
-            df[col] = df[col].astype(str)
-        else:
-            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(default).astype(float)
-    return df
-
-ss.glaze_piece_df = st.data_editor(
-    ensure_cols(ss.glaze_piece_df, {"Material": "", "Cost_per_lb": 0.0, "Grams_per_piece": 0.0}),
-    column_config={
-        "Material": st.column_config.TextColumn("Material", help="Raw material name"),
-        "Cost_per_lb": st.column_config.NumberColumn("Cost per lb", min_value=0.0, step=0.01),
-        "Grams_per_piece": st.column_config.NumberColumn("Grams per piece", min_value=0.0, step=0.1),
-    },
-    num_rows="dynamic",
-    use_container_width=True,
-    key="glaze_piece_editor_front",
-)
-
-# --- Glaze cost helpers (all use $/lb as input) ---
-
-def glaze_cost_from_piece_table(df):
-    """Cost per piece from manual 'glaze per piece' table (Material, $/lb, grams per piece)."""
-    gdf = ensure_cols(df, {"Material": "", "Cost_per_lb": 0.0, "Grams_per_piece": 0.0}).copy()
-    gdf["Cost_per_g"] = gdf["Cost_per_lb"] / 453.592
-    gdf["Cost_per_piece"] = gdf["Cost_per_g"] * gdf["Grams_per_piece"]
-    return float(gdf["Cost_per_piece"].sum()), gdf
-    
-    # Make sure grams-per-piece exists in session state
 if "recipe_grams_per_piece" not in ss:
     ss.recipe_grams_per_piece = 8.0
 
 
+# --- Glaze helpers ---
+def glaze_cost_from_piece_table(df):
+    gdf = ensure_cols(df, {"Material": "", "Cost_per_lb": 0.0, "Grams_per_piece": 0.0}).copy()
+    gdf["Cost_per_g"] = gdf["Cost_per_lb"] / 453.592
+    gdf["Cost_per_piece"] = gdf["Cost_per_g"] * gdf["Grams_per_piece"]
+    return float(gdf["Cost_per_piece"].sum()), gdf
 
 def percent_recipe_table(catalog_df, recipe_df, batch_g):
-    """Cost of a batch from a recipe in percents + catalog cost per lb."""
     price_map = {
         str(r["Material"]).strip().lower(): float(r["Cost_per_lb"]) / 453.592
         for _, r in ensure_cols(catalog_df, {"Material": "", "Cost_per_lb": 0.0}).iterrows()
     }
     rdf = ensure_cols(recipe_df, {"Material": "", "Percent": 0.0}).copy()
     tot = float(rdf["Percent"].sum()) or 100.0
-
     rows = []
     for _, r in rdf.iterrows():
         name = str(r["Material"]).strip()
@@ -157,53 +120,20 @@ def percent_recipe_table(catalog_df, recipe_df, batch_g):
     cost_per_lb = cost_per_g * 453.592
     return out, batch_total, cost_per_g, cost_per_oz, cost_per_lb
 
-
-grams_pp = float(ss.get("recipe_grams_per_piece", 8.0))
-recipe_df, glaze_pp_cost = glaze_per_piece_from_recipe(
-    ss.catalog_df, ss.recipe_df, grams_pp
-)
-
-    rdf = ensure_cols(recipe_df, {"Material": "", "Percent": 0.0}).copy()
-    tot = float(rdf["Percent"].sum()) or 100.0
-
-    rows = []
-    total_cost_pp = 0.0
-    for _, r in rdf.iterrows():
-        name = str(r["Material"]).strip()
-        pct = float(r["Percent"])
-        g = grams_per_piece * pct / tot
-        cost_g = price_map.get(name.lower(), 0.0)
-        cost_pp = g * cost_g
-        total_cost_pp += cost_pp
-        rows.append({
-            "Material": name,
-            "Percent": round(pct, 2),
-            "Grams_per_piece": round(g, 3),
-            "Ounces_per_piece": round(g / 28.3495, 3),
-            "Pounds_per_piece": round(g / 453.592, 4),
-            "Cost_per_piece": cost_pp
-        })
-
-    df = pd.DataFrame(rows)
-    return df, float(total_cost_pp)
-
-
-    # price per gram from $ per lb
+def glaze_per_piece_from_recipe(catalog_df, recipe_df, grams_per_piece):
     price_map = {
         str(r["Material"]).strip().lower(): float(r["Cost_per_lb"]) / 453.592
-        for _, r in df_safe(catalog_df, ["Material","Cost_per_lb"]).iterrows()
+        for _, r in ensure_cols(catalog_df, {"Material": "", "Cost_per_lb": 0.0}).iterrows()
     }
-    rdf = df_safe(recipe_df, ["Material","Percent"]).copy()
+    rdf = ensure_cols(recipe_df, {"Material": "", "Percent": 0.0}).copy()
     tot = float(rdf["Percent"].sum()) or 100.0
-
     rows = []
     total_cost_pp = 0.0
     for _, r in rdf.iterrows():
         name = str(r["Material"]).strip()
         pct = float(r["Percent"])
         g = grams_per_piece * pct / tot
-        cost_g = price_map.get(name.lower(), 0.0)
-        cost_pp = g * cost_g
+        cost_pp = g * price_map.get(name.lower(), 0.0)
         total_cost_pp += cost_pp
         rows.append({
             "Material": name,
@@ -215,9 +145,75 @@ recipe_df, glaze_pp_cost = glaze_per_piece_from_recipe(
         })
     df = pd.DataFrame(rows)
     return df, float(total_cost_pp)
-if "inputs.setdefault" not in ss:
+
+
+# --- Energy ---
+def calc_energy(ip):
+    e_cost = (ip["kwh_bisque"] + ip["kwh_glaze"]) * ip["kwh_rate"]
+    e_pp = e_cost / max(1, int(ip["pieces_per_electric_firing"]))
+    gas_firing_cost = 0.0
+    fuel = str(ip.get("fuel_gas", "None")).strip()
+    if fuel == "Propane":
+        gas_firing_cost = ip.get("lp_price_per_gal", 0.0) * (ip.get("lp_gal_bisque", 0.0) + ip.get("lp_gal_glaze", 0.0))
+    elif fuel == "Natural Gas":
+        gas_firing_cost = ip.get("ng_price_per_therm", 0.0) * (ip.get("ng_therms_bisque", 0.0) + ip.get("ng_therms_glaze", 0.0))
+    g_pp = gas_firing_cost / max(1, int(ip.get("pieces_per_gas_firing", 40)))
+    return e_pp + g_pp
+import streamlit as st
+import pandas as pd
+import json
+
+st.set_page_config(page_title="Pottery Pricing App", layout="wide")
+
+ss = st.session_state
+
+# Helpers
+def ensure_cols(df, schema: dict):
+    if df is None:
+        df = pd.DataFrame()
+    else:
+        df = df.copy()
+    for col, default in schema.items():
+        if col not in df.columns:
+            df[col] = default
+    df = df[list(schema.keys())]
+    for col, default in schema.items():
+        if isinstance(default, str):
+            df[col] = df[col].astype(str)
+        else:
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(default).astype(float)
+    return df
+
+def money(n):
+    try:
+        return f"${n:,.2f}"
+    except Exception:
+        return "$0.00"
+
+def to_json_bytes(obj):
+    return json.dumps(obj, indent=2).encode("utf-8")
+
+def from_json_bytes(b):
+    return json.loads(b.decode("utf-8"))
+
+# Session defaults
+if "inputs" not in ss:
+    ss.inputs = dict(
+        units_made=1,
+        clay_price_per_bag=25.0,
+        clay_bag_weight_lb=25.0,
+        clay_weight_per_piece_lb=1.0,
+        clay_yield=0.9,
+        packaging_per_piece=0.5,
+        kwh_rate=0.15, kwh_bisque=30.0, kwh_glaze=35.0, pieces_per_electric_firing=40,
+        gas_rate=2.50, gas_units_bisque=0.0, gas_units_glaze=0.0, pieces_per_gas_firing=40,
+        labor_rate=25.0, hours_per_piece=0.25,
+        overhead_per_month=500.0, pieces_per_month=200,
+        use_2x2x2=False, wholesale_margin_pct=50, retail_multiplier=2.2,
+    )
+
 # Backfill new energy keys if missing
-  for k, v in {
+for k, v in {
     "fuel_gas": "None",
     "lp_price_per_gal": 3.50,
     "lp_gal_bisque": 0.0,
@@ -229,29 +225,105 @@ if "inputs.setdefault" not in ss:
 }.items():
     ss.inputs.setdefault(k, v)
 
+# Data defaults
+if "catalog_df" not in ss:
+    ss.catalog_df = pd.DataFrame([
+        {"Material": "Custer Feldspar", "Cost_per_lb": 1.72},
+        {"Material": "Silica 325m",     "Cost_per_lb": 0.82},
+        {"Material": "EPK Kaolin",      "Cost_per_lb": 0.54},
+        {"Material": "Frit 3134",       "Cost_per_lb": 2.04},
+    ])
 
+if "recipe_df" not in ss:
+    ss.recipe_df = pd.DataFrame([
+        {"Material":"Custer Feldspar","Percent":40.0},
+        {"Material":"Silica 325m","Percent":20.0},
+        {"Material":"EPK Kaolin","Percent":20.0},
+        {"Material":"Frit 3134","Percent":20.0},
+    ])
+
+if "recipe_grams_per_piece" not in ss:
+    ss.recipe_grams_per_piece = 8.0
+
+if "glaze_piece_df" not in ss:
+    ss.glaze_piece_df = pd.DataFrame([
+        {"Material":"Frit 3134","Cost_per_lb":2.04,"Grams_per_piece":5.0},
+        {"Material":"EPK Kaolin","Cost_per_lb":0.54,"Grams_per_piece":3.0},
+    ])
+
+# Glaze helpers
+def glaze_cost_from_piece_table(df):
+    gdf = ensure_cols(df, {"Material": "", "Cost_per_lb": 0.0, "Grams_per_piece": 0.0}).copy()
+    gdf["Cost_per_g"] = gdf["Cost_per_lb"] / 453.592
+    gdf["Cost_per_piece"] = gdf["Cost_per_g"] * gdf["Grams_per_piece"]
+    return float(gdf["Cost_per_piece"].sum()), gdf
+
+def percent_recipe_table(catalog_df, recipe_df, batch_g):
+    price_map = {
+        str(r["Material"]).strip().lower(): float(r["Cost_per_lb"]) / 453.592
+        for _, r in ensure_cols(catalog_df, {"Material": "", "Cost_per_lb": 0.0}).iterrows()
+    }
+    rdf = ensure_cols(recipe_df, {"Material": "", "Percent": 0.0}).copy()
+    tot = float(rdf["Percent"].sum()) or 100.0
+    rows = []
+    for _, r in rdf.iterrows():
+        name = str(r["Material"]).strip()
+        pct = float(r["Percent"])
+        grams = batch_g * pct / tot
+        cost = grams * price_map.get(name.lower(), 0.0)
+        rows.append({
+            "Material": name,
+            "Percent": pct,
+            "Grams": round(grams, 2),
+            "Ounces": round(grams / 28.3495, 2),
+            "Pounds": round(grams / 453.592, 3),
+            "Cost": cost
+        })
+    out = pd.DataFrame(rows)
+    batch_total = float(out["Cost"].sum()) if not out.empty else 0.0
+    cost_per_g = batch_total / batch_g if batch_g else 0.0
+    cost_per_oz = cost_per_g * 28.3495
+    cost_per_lb = cost_per_g * 453.592
+    return out, batch_total, cost_per_g, cost_per_oz, cost_per_lb
+
+def glaze_per_piece_from_recipe(catalog_df, recipe_df, grams_per_piece):
+    price_map = {
+        str(r["Material"]).strip().lower(): float(r["Cost_per_lb"]) / 453.592
+        for _, r in ensure_cols(catalog_df, {"Material": "", "Cost_per_lb": 0.0}).iterrows()
+    }
+    rdf = ensure_cols(recipe_df, {"Material": "", "Percent": 0.0}).copy()
+    tot = float(rdf["Percent"].sum()) or 100.0
+    rows = []
+    total_cost_pp = 0.0
+    for _, r in rdf.iterrows():
+        name = str(r["Material"]).strip()
+        pct = float(r["Percent"])
+        g = grams_per_piece * pct / tot
+        cost_pp = g * price_map.get(name.lower(), 0.0)
+        total_cost_pp += cost_pp
+        rows.append({
+            "Material": name,
+            "Percent": round(pct, 2),
+            "Grams_per_piece": round(g, 3),
+            "Ounces_per_piece": round(g / 28.3495, 3),
+            "Pounds_per_piece": round(g / 453.592, 4),
+            "Cost_per_piece": cost_pp
+        })
+    df = pd.DataFrame(rows)
+    return df, float(total_cost_pp)
+
+# Energy and totals
 def calc_energy(ip):
-    # electric
     e_cost = (ip["kwh_bisque"] + ip["kwh_glaze"]) * ip["kwh_rate"]
     e_pp = e_cost / max(1, int(ip["pieces_per_electric_firing"]))
-
-    # gas by fuel type
     gas_firing_cost = 0.0
     fuel = str(ip.get("fuel_gas", "None")).strip()
-
     if fuel == "Propane":
-        gas_firing_cost = ip.get("lp_price_per_gal", 0.0) * (
-            ip.get("lp_gal_bisque", 0.0) + ip.get("lp_gal_glaze", 0.0)
-        )
+        gas_firing_cost = ip.get("lp_price_per_gal", 0.0) * (ip.get("lp_gal_bisque", 0.0) + ip.get("lp_gal_glaze", 0.0))
     elif fuel == "Natural Gas":
-        gas_firing_cost = ip.get("ng_price_per_therm", 0.0) * (
-            ip.get("ng_therms_bisque", 0.0) + ip.get("ng_therms_glaze", 0.0)
-        )
-
+        gas_firing_cost = ip.get("ng_price_per_therm", 0.0) * (ip.get("ng_therms_bisque", 0.0) + ip.get("ng_therms_glaze", 0.0))
     g_pp = gas_firing_cost / max(1, int(ip.get("pieces_per_gas_firing", 40)))
     return e_pp + g_pp
-
-
 
 def calc_totals(ip, glaze_per_piece_cost):
     clay_cost_per_lb = ip["clay_price_per_bag"] / ip["clay_bag_weight_lb"] if ip["clay_bag_weight_lb"] else 0.0
@@ -275,9 +347,13 @@ def calc_totals(ip, glaze_per_piece_cost):
         energy_pp=energy_pp, labor_pp=labor_pp, oh_pp=overhead_pp,
         total_pp=total_pp, wholesale=wholesale, retail=retail, distributor=distributor
     )
-st.title("Pottery Cost Analysis App")
+# UI
+st.title("Pottery Pricing App")
 
-tabs = st.tabs(["Per unit","Glaze recipe","Energy","Labor and overhead","Pricing","Compare","Save and load","Report","About"])
+tabs = st.tabs([
+    "Per unit", "Glaze recipe", "Energy", "Labor and overhead",
+    "Pricing", "Compare", "Save and load", "Report", "About"
+])
 
 # Per unit
 with tabs[0]:
@@ -293,28 +369,32 @@ with tabs[0]:
         ip["clay_yield"] = st.slider("Clay yield after trimming and loss", min_value=0.5, max_value=1.0, value=float(ip["clay_yield"]), step=0.01)
         ip["packaging_per_piece"] = st.number_input("Packaging per piece", min_value=0.0, value=float(ip["packaging_per_piece"]), step=0.1)
 
-        st.subheader("Choose glaze source")
+        st.subheader("Glaze source")
         glaze_source = st.radio("Glaze cost comes from", ["Recipe tab", "Manual table"], index=0, horizontal=True)
 
         if glaze_source == "Manual table":
-            st.caption("Edit grams per piece and cost per lb on the Glaze per piece table below.")
+            st.caption("Edit names, cost per lb, and grams per piece.")
             ss.glaze_piece_df = st.data_editor(
-                df_safe(ss.glaze_piece_df, ["Material","Cost_per_kg","Grams_per_piece"]),  # legacy column kept if you still use this view
-                num_rows="dynamic", use_container_width=True, key="glaze_piece_editor_front"
+                ensure_cols(ss.glaze_piece_df, {"Material": "", "Cost_per_lb": 0.0, "Grams_per_piece": 0.0}),
+                column_config={
+                    "Material": st.column_config.TextColumn("Material", help="Raw material name"),
+                    "Cost_per_lb": st.column_config.NumberColumn("Cost per lb", min_value=0.0, step=0.01),
+                    "Grams_per_piece": st.column_config.NumberColumn("Grams per piece", min_value=0.0, step=0.1),
+                },
+                num_rows="dynamic",
+                use_container_width=True,
+                key="glaze_piece_editor_front",
             )
-            glaze_pp_cost, gdetail = glaze_cost_from_piece_table(ss.glaze_piece_df)
-            source_df = gdetail.copy()
+            glaze_pp_cost, source_df = glaze_cost_from_piece_table(ss.glaze_piece_df)
         else:
-            st.caption("Reads materials and $ per lb from the Catalog on the Glaze recipe tab.")
-            # uses recipe tab data and grams per piece input from the recipe tab
-            recipe_df, glaze_pp_cost = glaze_per_piece_from_recipe(ss.catalog_df, ss.recipe_df, ss.recipe_grams_per_piece)
-            source_df = recipe_df.copy()
+            grams_pp = float(ss.get("recipe_grams_per_piece", 8.0))
+            source_df, glaze_pp_cost = glaze_per_piece_from_recipe(ss.catalog_df, ss.recipe_df, grams_pp)
 
-        # format for display
-        if "Cost_per_piece" in source_df.columns:
-            source_df["Cost_per_piece"] = source_df["Cost_per_piece"].map(money)
         st.subheader("Glaze per piece and cost")
-        st.dataframe(source_df, use_container_width=True)
+        show_df = source_df.copy()
+        if "Cost_per_piece" in show_df.columns:
+            show_df["Cost_per_piece"] = show_df["Cost_per_piece"].map(money)
+        st.dataframe(show_df, use_container_width=True)
 
     with right:
         st.subheader("Per piece totals")
@@ -329,43 +409,74 @@ with tabs[0]:
         c[2].metric("Overhead", money(totals["oh_pp"]))
         st.metric("Total cost per piece", money(totals["total_pp"]))
 
-        st.subheader("Prices")
-        c = st.columns(3)
-        c[0].metric("Wholesale", money(totals["wholesale"]))
-        c[1].metric("Retail", money(totals["retail"]))
-        if totals["distributor"] is not None:
-            c[2].metric("Distributor", money(totals["distributor"]))
+# Glaze recipe
+with tabs[1]:
+    st.subheader("Catalog cost per lb")
+    ss.catalog_df = st.data_editor(
+        ensure_cols(ss.catalog_df, {"Material": "", "Cost_per_lb": 0.0}),
+        column_config={
+            "Material": st.column_config.TextColumn("Material"),
+            "Cost_per_lb": st.column_config.NumberColumn("Cost per lb", min_value=0.0, step=0.01),
+        },
+        num_rows="dynamic", use_container_width=True, key="catalog_editor"
+    )
 
+    st.subheader("Recipe in percent")
+    ss.recipe_df = st.data_editor(
+        ensure_cols(ss.recipe_df, {"Material": "", "Percent": 0.0}),
+        column_config={
+            "Material": st.column_config.TextColumn("Material"),
+            "Percent": st.column_config.NumberColumn("Percent", min_value=0.0, step=0.1),
+        },
+        num_rows="dynamic", use_container_width=True, key="recipe_editor"
+    )
 
-# Catalog (Cost per lb)
-ss.catalog_df = st.data_editor(
-    ensure_cols(ss.catalog_df, {"Material": "", "Cost_per_lb": 0.0}),
-    column_config={
-        "Material": st.column_config.TextColumn("Material"),
-        "Cost_per_lb": st.column_config.NumberColumn("Cost per lb", min_value=0.0, step=0.01),
-    },
-    num_rows="dynamic",
-    use_container_width=True,
-    key="catalog_editor",
-)
+    colA, colB = st.columns([2,1])
+    with colA:
+        batch_str = st.text_input("Batch size", value="100")
+    with colB:
+        unit = st.selectbox("Units", ["g", "oz", "lb"], index=0)
 
-# Recipe in percent
-ss.recipe_df = st.data_editor(
-    ensure_cols(ss.recipe_df, {"Material": "", "Percent": 0.0}),
-    column_config={
-        "Material": st.column_config.TextColumn("Material"),
-        "Percent": st.column_config.NumberColumn("Percent", min_value=0.0, step=0.1),
-    },
-    num_rows="dynamic",
-    use_container_width=True,
-    key="recipe_editor",
-)
+    def _to_float(s):
+        try:
+            return float(str(s).strip())
+        except Exception:
+            return 0.0
 
+    batch_val = _to_float(batch_str)
+    if unit == "g":
+        batch_g = batch_val
+    elif unit == "oz":
+        batch_g = batch_val * 28.3495
+    else:
+        batch_g = batch_val * 453.592
+    if batch_g <= 0:
+        st.warning("Enter a positive batch size")
 
+    out, batch_total, cpg, cpo, cpl = percent_recipe_table(ss.catalog_df, ss.recipe_df, batch_g)
+
+    st.caption(f"Batch size {batch_g:.0f} g  •  {batch_g/28.3495:.2f} oz  •  {batch_g/453.592:.3f} lb")
+    show = out.copy()
+    show["Cost"] = show["Cost"].map(money)
+    st.dataframe(show, use_container_width=True)
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Batch total", money(batch_total))
+    col2.metric("Cost per gram", money(cpg))
+    col3.metric("Cost per ounce", money(cpo))
+
+    col4, col5 = st.columns(2)
+    col4.metric("Cost per pound", money(cpl))
+
+    grams_str = st.text_input("Grams used per piece", value=str(ss.get("recipe_grams_per_piece", 8.0)))
+    try:
+        ss.recipe_grams_per_piece = float(grams_str)
+    except ValueError:
+        st.warning("Please enter a number")
+    st.metric("Glaze cost per piece from this recipe", money(cpg * ss.recipe_grams_per_piece))
 # Energy
 with tabs[2]:
     ip = ss.inputs
-
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("Electric")
@@ -412,14 +523,12 @@ with tabs[2]:
                 "Pieces per gas firing", min_value=1, value=int(ip.get("pieces_per_gas_firing", 40)), step=1
             )
         else:
-            st.caption("No gas costs included. Select Propane or Natural Gas to add them.")
+            st.caption("No gas costs included.")
 
     st.subheader("Per piece energy now")
     st.metric("Energy per piece", money(calc_energy(ip)))
 
-
-
-# Labor and Overhead
+# Labor and overhead
 with tabs[3]:
     ip = ss.inputs
     st.subheader("Labor")
@@ -440,13 +549,12 @@ with tabs[4]:
         ip["retail_multiplier"] = st.number_input("Retail multiplier on wholesale", min_value=1.0, value=float(ip["retail_multiplier"]), step=0.1)
 
     st.subheader("Pick glaze source")
-    mode = st.radio("Choose glaze cost input", ["Per piece table","Percent recipe"], horizontal=True)
-    if mode == "Per piece table":
+    mode = st.radio("Choose glaze cost input", ["Recipe tab", "Manual table"], horizontal=True)
+    if mode == "Manual table":
         glaze_pp_cost, _ = glaze_cost_from_piece_table(ss.glaze_piece_df)
     else:
-        # reuse last recipe batch cost per gram by simulating a 100 g batch if needed
-        out, batch_total, cpg, _, _ = percent_recipe_table(ss.catalog_df, ss.recipe_df, 100.0)
-        glaze_pp_cost = cpg * ss.recipe_grams_per_piece
+        grams_pp = float(ss.get("recipe_grams_per_piece", 8.0))
+        _, glaze_pp_cost = glaze_per_piece_from_recipe(ss.catalog_df, ss.recipe_df, grams_pp)
 
     totals = calc_totals(ip, glaze_pp_cost)
     st.subheader("Results")
@@ -466,14 +574,15 @@ with tabs[5]:
     st.write(f"App total {money(app_total)}")
     st.write(f"Excel total {money(expected)}")
     st.write(f"Difference {money(diff)}")
-# Save and Load
+
+# Save and load
 with tabs[6]:
     st.subheader("Save and load settings")
     state = dict(
         inputs=ss.inputs,
-        glaze_piece_df=df_safe(ss.glaze_piece_df, ["Material","Cost_per_kg","Grams_per_piece"]).to_dict(orient="list"),
-        catalog_df=df_safe(ss.catalog_df, ["Material","Cost_per_kg"]).to_dict(orient="list"),
-        recipe_df=df_safe(ss.recipe_df, ["Material","Percent"]).to_dict(orient="list"),
+        glaze_piece_df=ensure_cols(ss.glaze_piece_df, {"Material": "", "Cost_per_lb": 0.0, "Grams_per_piece": 0.0}).to_dict(orient="list"),
+        catalog_df=ensure_cols(ss.catalog_df, {"Material": "", "Cost_per_lb": 0.0}).to_dict(orient="list"),
+        recipe_df=ensure_cols(ss.recipe_df, {"Material": "", "Percent": 0.0}).to_dict(orient="list"),
         recipe_grams_per_piece=ss.recipe_grams_per_piece
     )
     st.download_button("Download settings JSON", to_json_bytes(state), file_name="pottery_pricing_settings.json")
@@ -482,6 +591,7 @@ with tabs[6]:
         try:
             data = from_json_bytes(up.read())
             ss.inputs.update(data.get("inputs", {}))
+
             def dict_to_df(d, cols):
                 if not isinstance(d, dict) or not d:
                     return pd.DataFrame(columns=cols)
@@ -490,9 +600,10 @@ with tabs[6]:
                     if c not in df.columns:
                         df[c] = []
                 return df[cols]
-            ss.glaze_piece_df = dict_to_df(data.get("glaze_piece_df", {}), ["Material","Cost_per_kg","Grams_per_piece"])
-            ss.catalog_df = dict_to_df(data.get("catalog_df", {}), ["Material","Cost_per_kg"])
-            ss.recipe_df = dict_to_df(data.get("recipe_df", {}), ["Material","Percent"])
+
+            ss.glaze_piece_df = dict_to_df(data.get("glaze_piece_df", {}), ["Material", "Cost_per_lb", "Grams_per_piece"])
+            ss.catalog_df = dict_to_df(data.get("catalog_df", {}), ["Material", "Cost_per_lb"])
+            ss.recipe_df = dict_to_df(data.get("recipe_df", {}), ["Material", "Percent"])
             ss.recipe_grams_per_piece = float(data.get("recipe_grams_per_piece", ss.recipe_grams_per_piece))
             st.success("Loaded")
         except Exception as e:
@@ -501,8 +612,10 @@ with tabs[6]:
 # Report
 with tabs[7]:
     ip = ss.inputs
-    glaze_pp_cost, _ = glaze_cost_from_piece_table(ss.glaze_piece_df)
-    totals = calc_totals(ip, glaze_pp_cost)
+    grams_pp = float(ss.get("recipe_grams_per_piece", 8.0))
+    _, glaze_pp_from_recipe = glaze_per_piece_from_recipe(ss.catalog_df, ss.recipe_df, grams_pp)
+    totals = calc_totals(ip, glaze_pp_from_recipe)
+
     st.subheader("Per piece totals")
     r = st.columns(3)
     r[0].markdown("Clay " + money(totals["clay_pp"]))
@@ -516,6 +629,7 @@ with tabs[7]:
     st.subheader("Prices")
     st.markdown("Wholesale " + money(totals["wholesale"]))
     st.markdown("Retail " + money(totals["retail"]))
+    st.caption("Glaze costs calculated from Catalog cost per lb and recipe percents.")
 
 # About
 with tabs[8]:
@@ -529,4 +643,3 @@ Privacy
 Your numbers stay in your browser while the app runs.
 When you save settings the app downloads a JSON file to your computer.
 """)
-
