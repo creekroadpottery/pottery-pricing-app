@@ -647,7 +647,7 @@ Your numbers stay private while the app runs in your browser.
 When you save settings, a small JSON file is downloaded to your computer.  
 No data is sent anywhere else.  
 
-Alford Wayman
+Alford Wayman - 
 Artist/Owner
 — Creek Road Pottery LLC
 """)
