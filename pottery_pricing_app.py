@@ -118,6 +118,7 @@ def glaze_cost_from_piece_table(df):
     gdf["Cost_per_g"] = gdf["Cost_per_lb"] / 453.592
     gdf["Cost_per_piece"] = gdf["Cost_per_g"] * gdf["Grams_per_piece"]
     return float(gdf["Cost_per_piece"].sum()), gdf
+}
 
     out = pd.DataFrame(rows)
     batch_total = float(out["Cost"].sum()) if not out.empty else 0.0
