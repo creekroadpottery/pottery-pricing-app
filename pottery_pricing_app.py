@@ -395,7 +395,7 @@ with tabs[0]:
     ip = ss.inputs
     left, right = st.columns(2)
 
-    with left:
+with left:
     st.subheader("Clay and packaging")
 
     ip["units_made"] = st.number_input("Units in this batch", min_value=1, value=int(ip["units_made"]), step=1)
