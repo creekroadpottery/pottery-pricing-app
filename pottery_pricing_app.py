@@ -709,10 +709,10 @@ else:
     _, glaze_pp_cost = glaze_per_piece_from_recipe(ss.catalog_df, ss.recipe_df, grams_pp)
 
 # compute other project materials per piece
-other_pp, _, _ = other_materials_pp(ss.other_mat_df, int(ss.inputs["units_made"]))
-
+other_pp, _, _ = other_materials_pp(ss.other_mat_df, 
+    int(ss.inputs["units_made"]))
 totals = calc_totals(ip, glaze_pp_cost, other_pp)
-   st.subheader("Results")
+st.subheader("Results")
     c = st.columns(3)
     c[0].metric("Wholesale", money(totals["wholesale"]))
     c[1].metric("Retail", money(totals["retail"]))
