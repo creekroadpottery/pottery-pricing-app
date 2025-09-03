@@ -34,6 +34,16 @@ def to_json_bytes(obj):
 
 def from_json_bytes(b):
     return json.loads(b.decode("utf-8"))
+    
+def other_materials_pp(df, pieces_in_project:int):
+    df2 = ensure_cols(df, {
+        "Item":"", "Unit":"", "Cost_per_unit":0.0, "Quantity_for_project":0.0
+    }).copy()
+    df2["Line_total"] = df2["Cost_per_unit"] * df2["Quantity_for_project"]
+    project_total = float(df2["Line_total"].sum())
+    per_piece = project_total / max(1, int(pieces_in_project))
+    df2["Cost_per_piece"] = df2["Line_total"] / max(1, int(pieces_in_project))
+    return per_piece, project_total, df2
 
 
 # --- Session defaults ---
@@ -51,6 +61,11 @@ if "inputs" not in ss:
         overhead_per_month=500.0, pieces_per_month=200,
         use_2x2x2=False, wholesale_margin_pct=50, retail_multiplier=2.2,
     )
+# Other project materials (free-form list)
+if "other_mat_df" not in ss:
+    ss.other_mat_df = pd.DataFrame([
+        {"Item":"Hand pump","Unit":"each","Cost_per_unit":0.85,"Quantity_for_project":16.0},
+    ])
 
 # backfill energy keys
 for k, v in {
@@ -359,14 +374,16 @@ def calc_energy(ip):
     return e_pp + fuel_pp
 
 
-def calc_totals(ip, glaze_per_piece_cost):
+def calc_totals(ip, glaze_per_piece_cost, other_pp: float = 0.0):
     clay_cost_per_lb = ip["clay_price_per_bag"] / ip["clay_bag_weight_lb"] if ip["clay_bag_weight_lb"] else 0.0
     clay_pp = (ip["clay_weight_per_piece_lb"] / max(ip["clay_yield"], 1e-9)) * clay_cost_per_lb
     energy_pp = calc_energy(ip)
     labor_pp = ip["labor_rate"] * ip["hours_per_piece"]
     overhead_pp = ip["overhead_per_month"] / max(1, int(ip["pieces_per_month"]))
-    material_pp = clay_pp + glaze_per_piece_cost + ip["packaging_per_piece"]
+
+    material_pp = clay_pp + glaze_per_piece_cost + ip["packaging_per_piece"] + other_pp
     total_pp = material_pp + energy_pp + labor_pp + overhead_pp
+
     if ip["use_2x2x2"]:
         wholesale = total_pp * 2.0
         retail = wholesale * 2.0
@@ -376,11 +393,13 @@ def calc_totals(ip, glaze_per_piece_cost):
         wholesale = total_pp / max(1e-9, 1.0 - margin) if margin < 1 else float("inf")
         retail = wholesale * ip["retail_multiplier"]
         distributor = None
+
     return dict(
         clay_pp=clay_pp, glaze_pp=glaze_per_piece_cost, pack_pp=ip["packaging_per_piece"],
-        energy_pp=energy_pp, labor_pp=labor_pp, oh_pp=overhead_pp,
+        other_pp=other_pp, energy_pp=energy_pp, labor_pp=labor_pp, oh_pp=overhead_pp,
         total_pp=total_pp, wholesale=wholesale, retail=retail, distributor=distributor
     )
+
 # UI
 st.title("Pottery Cost Analysis App")
 
@@ -444,20 +463,39 @@ with left:
     if "Cost_per_piece" in show_df.columns:
         show_df["Cost_per_piece"] = show_df["Cost_per_piece"].map(money)
     st.dataframe(show_df, use_container_width=True)
+st.subheader("Other project materials")
+st.caption("Use this to add one-time items for the current project. Cost is divided by the number of pieces in this batch.")
+
+ss.other_mat_df = st.data_editor(
+    ensure_cols(ss.other_mat_df, {"Item":"", "Unit":"", "Cost_per_unit":0.0, "Quantity_for_project":0.0}),
+    column_config={
+        "Item": st.column_config.TextColumn("Item"),
+        "Unit": st.column_config.TextColumn("Unit"),
+        "Cost_per_unit": st.column_config.NumberColumn("Cost per unit", min_value=0.0, step=0.01),
+        "Quantity_for_project": st.column_config.NumberColumn("Quantity for project", min_value=0.0, step=0.1),
+    },
+    num_rows="dynamic",
+    use_container_width=True,
+    key="other_materials_editor",
+)
+
+other_pp, other_proj_total, other_df = other_materials_pp(ss.other_mat_df, int(ip["units_made"]))
+show_other = other_df.copy()
+show_other["Line_total"] = show_other["Line_total"].map(money)
+show_other["Cost_per_piece"] = show_other["Cost_per_piece"].map(money)
+st.dataframe(show_other, use_container_width=True)
+st.caption(f"Project total {money(other_proj_total)}  •  Adds {money(other_pp)} per piece")
 
 
     with right:
         st.subheader("Per piece totals")
-        totals = calc_totals(ip, glaze_pp_cost)
+        totals = calc_totals(ip, glaze_pp_cost, other_pp)
         c = st.columns(3)
-        c[0].metric("Clay", money(totals["clay_pp"]))
-        c[1].metric("Glaze", money(totals["glaze_pp"]))
-        c[2].metric("Packaging", money(totals["pack_pp"]))
-        c = st.columns(3)
-        c[0].metric("Energy", money(totals["energy_pp"]))
-        c[1].metric("Labor", money(totals["labor_pp"]))
-        c[2].metric("Overhead", money(totals["oh_pp"]))
-        st.metric("Total cost per piece", money(totals["total_pp"]))
+c[0].metric("Energy", money(totals["energy_pp"]))
+c[1].metric("Labor", money(totals["labor_pp"]))
+c[2].metric("Overhead", money(totals["oh_pp"]))
+st.metric("Other project materials", money(totals["other_pp"]))
+st.metric("Total cost per piece", money(totals["total_pp"]))
 
 # Glaze recipe
 with tabs[1]:
@@ -663,6 +701,17 @@ with tabs[4]:
     else:
         grams_pp = float(ss.get("recipe_grams_per_piece", 8.0))
         _, glaze_pp_cost = glaze_per_piece_from_recipe(ss.catalog_df, ss.recipe_df, grams_pp)
+# compute glaze per piece (existing)
+if mode == "Manual table":
+    glaze_pp_cost, _ = glaze_cost_from_piece_table(ss.glaze_piece_df)
+else:
+    grams_pp = float(ss.get("recipe_grams_per_piece", 8.0))
+    _, glaze_pp_cost = glaze_per_piece_from_recipe(ss.catalog_df, ss.recipe_df, grams_pp)
+
+# compute other project materials per piece
+other_pp, _, _ = other_materials_pp(ss.other_mat_df, int(ss.inputs["units_made"]))
+
+totals = calc_totals(ip, glaze_pp_cost, other_pp)
 
     totals = calc_totals(ip, glaze_pp_cost)
     st.subheader("Results")
@@ -712,14 +761,18 @@ with tabs[5]:
 with tabs[6]:
     ip = ss.inputs
     grams_pp = float(ss.get("recipe_grams_per_piece", 8.0))
-    _, glaze_pp_from_recipe = glaze_per_piece_from_recipe(ss.catalog_df, ss.recipe_df, grams_pp)
-    totals = calc_totals(ip, glaze_pp_from_recipe)
+_, glaze_pp_from_recipe = glaze_per_piece_from_recipe(ss.catalog_df, ss.recipe_df, grams_pp)
+other_pp, _, _ = other_materials_pp(ss.other_mat_df, int(ss.inputs["units_made"]))
+totals = calc_totals(ip, glaze_pp_from_recipe, other_pp)
+
 
     st.subheader("Per piece totals")
     r = st.columns(3)
-    r[0].markdown("Clay " + money(totals["clay_pp"]))
-    r[1].markdown("Glaze " + money(totals["glaze_pp"]))
-    r[2].markdown("Packaging " + money(totals["pack_pp"]))
+r[0].markdown("Energy " + money(totals["energy_pp"]))
+r[1].markdown("Labor " + money(totals["labor_pp"]))
+r[2].markdown("Overhead " + money(totals["oh_pp"]))
+st.markdown("Other project materials " + money(totals["other_pp"]))
+
     r = st.columns(3)
     r[0].markdown("Energy " + money(totals["energy_pp"]))
     r[1].markdown("Labor " + money(totals["labor_pp"]))
