@@ -419,7 +419,7 @@ with left:
     ip["packaging_per_piece"] = st.number_input("Packaging per piece", min_value=0.0, value=float(ip["packaging_per_piece"]), step=0.1)
 
     st.subheader("Glaze source")
-        glaze_source = st.radio("Glaze cost comes from", ["Recipe tab", "Manual table"], index=0, horizontal=True)
+    glaze_source = st.radio("Glaze cost comes from", ["Recipe tab", "Manual table"], index=0, horizontal=True)
 
         if glaze_source == "Manual table":
             st.caption("Edit names, cost per lb, and grams per piece.")
