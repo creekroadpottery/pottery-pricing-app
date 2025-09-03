@@ -780,21 +780,23 @@ with tabs[5]:
 with tabs[6]:
     ip = ss.inputs
     grams_pp = float(ss.get("recipe_grams_per_piece", 8.0))
-_, glaze_pp_from_recipe = glaze_per_piece_from_recipe(ss.catalog_df, ss.recipe_df, grams_pp)
-other_pp, _, _ = other_materials_pp(ss.other_mat_df, int(ss.inputs["units_made"]))
-totals = calc_totals(ip, glaze_pp_from_recipe, other_pp)
-    
-    st.subheader("Per piece totals")
-    r = st.columns(3)
-    r[0].markdown("Energy " + money(totals["energy_pp"]))
-    r[1].markdown("Labor " + money(totals["labor_pp"]))
-    r[2].markdown("Overhead " + money(totals["oh_pp"]))
-    st.markdown("Other project materials " + money(totals["other_pp"]))
+    _, glaze_pp_from_recipe = glaze_per_piece_from_recipe(ss.catalog_df, ss.recipe_df, grams_pp)
+    other_pp, _, _ = other_materials_pp(ss.other_mat_df, int(ss.inputs["units_made"]))
+    totals = calc_totals(ip, glaze_pp_from_recipe, other_pp)
 
-    r = st.columns(3)
-    r[0].markdown("Energy " + money(totals["energy_pp"]))
-    r[1].markdown("Labor " + money(totals["labor_pp"]))
-    r[2].markdown("Overhead " + money(totals["oh_pp"]))
+    st.subheader("Per piece totals")
+
+    r1 = st.columns(3)
+    r1[0].markdown("Clay " + money(totals["clay_pp"]))
+    r1[1].markdown("Glaze " + money(totals["glaze_pp"]))
+    r1[2].markdown("Packaging " + money(totals["pack_pp"]))
+
+    r2 = st.columns(3)
+    r2[0].markdown("Other materials " + money(totals["other_pp"]))
+    r2[1].markdown("Energy " + money(totals["energy_pp"]))
+    r2[2].markdown("Labor " + money(totals["labor_pp"]))
+
+    st.markdown("Overhead " + money(totals["oh_pp"]))
     st.markdown("**Total cost** " + money(totals["total_pp"]))
 
     st.subheader("Prices")
@@ -816,6 +818,7 @@ totals = calc_totals(ip, glaze_pp_from_recipe, other_pp)
         st.caption("Fuel: None (only electric firing costs included)")
 
     st.caption("Glaze costs calculated from Catalog cost per lb/kg and recipe percents.")
+
 
 
 # About
