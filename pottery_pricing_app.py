@@ -422,28 +422,29 @@ with left:
     glaze_source = st.radio("Glaze cost comes from", ["Recipe tab", "Manual table"], index=0, horizontal=True)
 
     if glaze_source == "Manual table":
-            st.caption("Edit names, cost per lb, and grams per piece.")
-            ss.glaze_piece_df = st.data_editor(
-                ensure_cols(ss.glaze_piece_df, {"Material": "", "Cost_per_lb": 0.0, "Grams_per_piece": 0.0}),
-                column_config={
-                    "Material": st.column_config.TextColumn("Material", help="Raw material name"),
-                    "Cost_per_lb": st.column_config.NumberColumn("Cost per lb", min_value=0.0, step=0.01),
-                    "Grams_per_piece": st.column_config.NumberColumn("Grams per piece", min_value=0.0, step=0.1),
-                },
-                num_rows="dynamic",
-                use_container_width=True,
-                key="glaze_piece_editor_front",
-            )
-            glaze_pp_cost, source_df = glaze_cost_from_piece_table(ss.glaze_piece_df)
+        st.caption("Edit names, cost per lb, and grams per piece.")
+        ss.glaze_piece_df = st.data_editor(
+            ensure_cols(ss.glaze_piece_df, {"Material": "", "Cost_per_lb": 0.0, "Grams_per_piece": 0.0}),
+            column_config={
+                "Material": st.column_config.TextColumn("Material", help="Raw material name"),
+                "Cost_per_lb": st.column_config.NumberColumn("Cost per lb", min_value=0.0, step=0.01),
+                "Grams_per_piece": st.column_config.NumberColumn("Grams per piece", min_value=0.0, step=0.1),
+            },
+            num_rows="dynamic",
+            use_container_width=True,
+            key="glaze_piece_editor_front",
+        )
+        glaze_pp_cost, source_df = glaze_cost_from_piece_table(ss.glaze_piece_df)
     else:
-            grams_pp = float(ss.get("recipe_grams_per_piece", 8.0))
-            source_df, glaze_pp_cost = glaze_per_piece_from_recipe(ss.catalog_df, ss.recipe_df, grams_pp)
+        grams_pp = float(ss.get("recipe_grams_per_piece", 8.0))
+        source_df, glaze_pp_cost = glaze_per_piece_from_recipe(ss.catalog_df, ss.recipe_df, grams_pp)
 
-        st.subheader("Glaze per piece and cost")
-        show_df = source_df.copy()
-        if "Cost_per_piece" in show_df.columns:
-            show_df["Cost_per_piece"] = show_df["Cost_per_piece"].map(money)
-        st.dataframe(show_df, use_container_width=True)
+    st.subheader("Glaze per piece and cost")
+    show_df = source_df.copy()
+    if "Cost_per_piece" in show_df.columns:
+        show_df["Cost_per_piece"] = show_df["Cost_per_piece"].map(money)
+    st.dataframe(show_df, use_container_width=True)
+
 
     with right:
         st.subheader("Per piece totals")
