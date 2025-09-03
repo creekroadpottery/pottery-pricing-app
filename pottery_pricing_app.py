@@ -688,40 +688,57 @@ with tabs[3]:
 # Pricing
 with tabs[4]:
     ip = ss.inputs
-    st.subheader("Method")
-    ip["use_2x2x2"] = st.checkbox("Use 2 by 2 by 2", value=bool(ip["use_2x2x2"]))
-    if not ip["use_2x2x2"]:
-        ip["wholesale_margin_pct"] = st.slider("Wholesale margin percent", min_value=0, max_value=80, value=int(ip["wholesale_margin_pct"]), step=1)
-        ip["retail_multiplier"] = st.number_input("Retail multiplier on wholesale", min_value=1.0, value=float(ip["retail_multiplier"]), step=0.1)
 
-    st.subheader("Pick glaze source")
-    mode = st.radio("Choose glaze cost input", ["Recipe tab", "Manual table"], horizontal=True)
+    st.subheader("Pricing options")
+    ip["use_2x2x2"] = st.checkbox("Use 2x2x2 rule", value=ip.get("use_2x2x2", False))
+
+    if not ip["use_2x2x2"]:
+        ip["wholesale_margin_pct"] = st.slider(
+            "Wholesale margin percent",
+            min_value=0, max_value=90,
+            value=int(ip.get("wholesale_margin_pct", 50)), step=1
+        )
+        ip["retail_multiplier"] = st.number_input(
+            "Retail multiplier",
+            min_value=1.0, value=float(ip.get("retail_multiplier", 2.2)), step=0.1
+        )
+
+    # choose glaze cost method
+    mode = st.radio("Glaze cost source", ["Recipe tab", "Manual table"], horizontal=True)
+
     if mode == "Manual table":
         glaze_pp_cost, _ = glaze_cost_from_piece_table(ss.glaze_piece_df)
     else:
         grams_pp = float(ss.get("recipe_grams_per_piece", 8.0))
         _, glaze_pp_cost = glaze_per_piece_from_recipe(ss.catalog_df, ss.recipe_df, grams_pp)
-# compute glaze per piece (existing)
-if mode == "Manual table":
-    glaze_pp_cost, _ = glaze_cost_from_piece_table(ss.glaze_piece_df)
-else:
-    grams_pp = float(ss.get("recipe_grams_per_piece", 8.0))
-    _, glaze_pp_cost = glaze_per_piece_from_recipe(ss.catalog_df, ss.recipe_df, grams_pp)
 
-# compute other project materials per piece
-other_pp, _, _ = other_materials_pp(ss.other_mat_df, 
-    int(ss.inputs["units_made"]))
-totals = calc_totals(ip, glaze_pp_cost, other_pp)
+    # compute other project materials per piece
+    other_pp, _, _ = other_materials_pp(ss.other_mat_df, int(ss.inputs["units_made"]))
 
-  st.subheader("Results")
+    # totals
+    totals = calc_totals(ip, glaze_pp_cost, other_pp)
 
-c = st.columns(3)
-c[0].metric("Wholesale", money(totals["wholesale"]))
-c[1].metric("Retail", money(totals["retail"]))
-if totals["distributor"] is not None:
-    c[2].metric("Distributor", money(totals["distributor"]))
+    st.subheader("Results")
 
-st.metric("Total cost per piece", money(totals["total_pp"]))
+    c = st.columns(3)
+    c[0].metric("Wholesale", money(totals["wholesale"]))
+    c[1].metric("Retail", money(totals["retail"]))
+    if totals["distributor"] is not None:
+        c[2].metric("Distributor", money(totals["distributor"]))
+
+    c2 = st.columns(3)
+    c2[0].metric("Clay", money(totals["clay_pp"]))
+    c2[1].metric("Glaze", money(totals["glaze_pp"]))
+    c2[2].metric("Packaging", money(totals["pack_pp"]))
+
+    c3 = st.columns(3)
+    c3[0].metric("Other materials", money(totals["other_pp"]))
+    c3[1].metric("Energy", money(totals["energy_pp"]))
+    c3[2].metric("Labor", money(totals["labor_pp"]))
+
+    st.metric("Overhead", money(totals["oh_pp"]))
+    st.metric("Total cost per piece", money(totals["total_pp"]))
+
 
 
 
