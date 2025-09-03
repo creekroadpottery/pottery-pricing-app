@@ -232,40 +232,36 @@ tabs = st.tabs([
     "Pricing", "Save and load", "Report", "About"
 ])
 
-# ------------- Per unit -------------
-with tabs[0]:
-    ip = ss.inputs
-    left, right = st.columns(2)
-
 # left column
 with left:
-        # --- Form preset picker (with options) ---
-st.subheader("Form preset")
+    # --- Form preset picker (with options) ---
+    st.subheader("Form preset")
 
-# Safe access to the presets table
-preset_df = ensure_cols(
-    ss.get("form_presets_df", pd.DataFrame()),
-    {"Form":"", "Clay_lb_wet":0.0, "Default_glaze_g":0.0, "Notes":""}
-)
+    # Safe access to the presets table
+    preset_df = ensure_cols(
+        ss.get("form_presets_df", pd.DataFrame()),
+        {"Form":"", "Clay_lb_wet":0.0, "Default_glaze_g":0.0, "Notes":""}
+    )
 
-forms = list(preset_df["Form"]) if not preset_df.empty else []
-choice = st.selectbox("Choose a form", ["None"] + forms, index=0, key="form_choice")
+    forms = list(preset_df["Form"]) if not preset_df.empty else []
+    choice = st.selectbox("Choose a form", ["None"] + forms, index=0, key="form_choice")
 
-# Preview the preset (do not change inputs yet)
-if choice != "None" and not preset_df.empty:
-    row = preset_df.loc[preset_df["Form"] == choice].iloc[0]
-    preset_clay_lb = float(row.get("Clay_lb_wet", 0.0))
-    preset_glaze_g = float(row.get("Default_glaze_g", 0.0))
-    note = str(row.get("Notes", "")).strip()
+    # Preview the preset (do not change inputs yet)
+    if choice != "None" and not preset_df.empty:
+        row = preset_df.loc[preset_df["Form"] == choice].iloc[0]
+        preset_clay_lb = float(row.get("Clay_lb_wet", 0.0))
+        preset_glaze_g = float(row.get("Default_glaze_g", 0.0))
+        note = str(row.get("Notes", "")).strip()
 
-    c1, c2, c3 = st.columns([1, 1, 2])
-    with c1:
-        st.metric("Preset clay", f"{preset_clay_lb:.2f} lb")
-    with c2:
-        st.metric("Preset glaze", f"{preset_glaze_g:.0f} g")
-    with c3:
-        if note:
-            st.caption(note)
+        c1, c2, c3 = st.columns([1, 1, 2])
+        with c1:
+            st.metric("Preset clay", f"{preset_clay_lb:.2f} lb")
+        with c2:
+            st.metric("Preset glaze", f"{preset_glaze_g:.0f} g")
+        with c3:
+            if note:
+                st.caption(note)
+
 
     # right column
     with right:
