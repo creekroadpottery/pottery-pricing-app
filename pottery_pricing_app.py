@@ -713,12 +713,15 @@ other_pp, _, _ = other_materials_pp(ss.other_mat_df,
     int(ss.inputs["units_made"]))
 totals = calc_totals(ip, glaze_pp_cost, other_pp)
 st.subheader("Results")
-    c = st.columns(3)
-    c[0].metric("Wholesale", money(totals["wholesale"]))
-    c[1].metric("Retail", money(totals["retail"]))
-    if totals["distributor"] is not None:
-        c[2].metric("Distributor", money(totals["distributor"]))
-    st.metric("Total cost per piece", money(totals["total_pp"]))
+
+c = st.columns(3)
+c[0].metric("Wholesale", money(totals["wholesale"]))
+c[1].metric("Retail", money(totals["retail"]))
+if totals["distributor"] is not None:
+    c[2].metric("Distributor", money(totals["distributor"]))
+
+st.metric("Total cost per piece", money(totals["total_pp"]))
+
 
 
 # Save and load
