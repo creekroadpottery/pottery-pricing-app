@@ -374,15 +374,22 @@ if choice != "None":
         st.caption(f"Project total {money(project_total)} • Adds {money(other_pp)} per piece")
 
     # right column
+       # right column
     with right:
         st.subheader("Per piece totals")
+
         totals = calc_totals(ip, glaze_pp_cost, other_pp)
         c = st.columns(3)
-        c[0].metric("Energy", money(totals["energy_pp"]))
-        c[1].metric("Labor", money(totals["labor_pp"]))
-        c[2].metric("Overhead", money(totals["oh_pp"]))
+        with c[0]:
+            st.metric("Energy", money(totals["energy_pp"]))
+        with c[1]:
+            st.metric("Labor", money(totals["labor_pp"]))
+        with c[2]:
+            st.metric("Overhead", money(totals["oh_pp"]))
+
         st.metric("Other project materials", money(totals["other_pp"]))
         st.metric("Total cost per piece", money(totals["total_pp"]))
+
 
 with st.expander("Shrink rate helper"):
     # current shrink setting
