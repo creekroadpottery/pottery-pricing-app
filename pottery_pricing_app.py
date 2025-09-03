@@ -421,7 +421,7 @@ with left:
     st.subheader("Glaze source")
     glaze_source = st.radio("Glaze cost comes from", ["Recipe tab", "Manual table"], index=0, horizontal=True)
 
-        if glaze_source == "Manual table":
+    if glaze_source == "Manual table":
             st.caption("Edit names, cost per lb, and grams per piece.")
             ss.glaze_piece_df = st.data_editor(
                 ensure_cols(ss.glaze_piece_df, {"Material": "", "Cost_per_lb": 0.0, "Grams_per_piece": 0.0}),
