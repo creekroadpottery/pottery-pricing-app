@@ -718,10 +718,27 @@ with tabs[7]:
     r[1].markdown("Labor " + money(totals["labor_pp"]))
     r[2].markdown("Overhead " + money(totals["oh_pp"]))
     st.markdown("**Total cost** " + money(totals["total_pp"]))
+
     st.subheader("Prices")
     st.markdown("Wholesale " + money(totals["wholesale"]))
     st.markdown("Retail " + money(totals["retail"]))
-    st.caption("Glaze costs calculated from Catalog cost per lb and recipe percents.")
+    if totals["distributor"] is not None:
+        st.markdown("Distributor " + money(totals["distributor"]))
+
+    # Fuel info line
+    fuel = str(ip.get("fuel_gas", "None"))
+    if fuel == "Propane":
+        st.caption(f"Fuel: Propane at {money(ip.get('lp_price_per_gal',0.0))} per gallon")
+    elif fuel == "Natural Gas":
+        st.caption(f"Fuel: Natural Gas at {money(ip.get('ng_price_per_therm',0.0))} per therm")
+    elif fuel == "Wood":
+        st.caption(f"Fuel: Wood at {money(ip.get('wood_price_per_cord',0.0))} per cord "
+                   f"and {money(ip.get('wood_price_per_facecord',0.0))} per face cord")
+    else:
+        st.caption("Fuel: None (only electric firing costs included)")
+
+    st.caption("Glaze costs calculated from Catalog cost per lb/kg and recipe percents.")
+
 
 # About
 with tabs[8]:
