@@ -67,18 +67,18 @@ for k, v in {
 
 if "catalog_df" not in ss:
     ss.catalog_df = pd.DataFrame([
-        {"Material": "Enter raw material here.", "Cost_per_lb": 0.00},
-        {"Material": "Enter raw material here.",     "Cost_per_lb": 0.00},
-        {"Material": "Enter raw material here.",      "Cost_per_lb": 0.00},
-        {"Material": "Enter raw material here.",       "Cost_per_lb": 0.00},
+        {"Material": "Custer Feldspar.", "Cost_per_lb": 0.00},
+        {"Material": "Silica 325m.",     "Cost_per_lb": 0.00},
+        {"Material": "EPK Kaolin.",      "Cost_per_lb": 0.00},
+        {"Material": "Frit 3134.",       "Cost_per_lb": 0.00},
     ])
 
 if "recipe_df" not in ss:
     ss.recipe_df = pd.DataFrame([
-        {"Material":"Enter raw material here.","Percent":00.0},
-        {"Material":"Enter raw material here.","Percent":00.0},
-        {"Material":"Enter raw material here.","Percent":00.0},
-        {"Material":"Enter raw material here.","Percent":00.0},
+        {"Material":"Custer Feldspar.","Percent":00.0},
+        {"Material":"Silica 325m.","Percent":00.0},
+        {"Material":"EPK Kaolin.","Percent":00.0},
+        {"Material":"Frit 3134.","Percent":00.0},
     ])
 
 if "recipe_grams_per_piece" not in ss:
