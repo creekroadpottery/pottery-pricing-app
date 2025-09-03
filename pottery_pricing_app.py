@@ -92,6 +92,16 @@ if "glaze_piece_df" not in ss:
         {"Material":"Frit 3134","Cost_per_lb":0.00,"Grams_per_piece":0.0},
     ])
 
+# Form presets table in session (empty by default)
+if "form_presets_df" not in ss:
+    ss.form_presets_df = pd.DataFrame(
+        [{"Form":"Mug", "Clay_lb_wet":0.90, "Default_glaze_g":40, "Notes":"12 oz straight"},
+         {"Form":"Bowl (cereal)", "Clay_lb_wet":1.25, "Default_glaze_g":55, "Notes":"~6 in"},
+         {"Form":"Plate (10 in)", "Clay_lb_wet":2.50, "Default_glaze_g":110, "Notes":"dinner"}]
+    )
+    # If you prefer to start empty, use:
+    # ss.form_presets_df = pd.DataFrame(columns=["Form","Clay_lb_wet","Default_glaze_g","Notes"])
+
 # other materials default
 if "other_mat_df" not in ss:
     ss.other_mat_df = pd.DataFrame([
@@ -230,28 +240,32 @@ with tabs[0]:
     # left column
     with left:
         # --- Form preset picker (with options) ---
-        st.subheader("Form preset")
+st.subheader("Form preset")
 
-        # Build choices
-        forms = list(ss.form_presets_df["Form"]) if not ss.form_presets_df.empty else []
-        choice = st.selectbox("Choose a form", ["None"] + forms, index=0, key="form_choice")
+# Safe access to the presets table
+preset_df = ensure_cols(
+    ss.get("form_presets_df", pd.DataFrame()),
+    {"Form":"", "Clay_lb_wet":0.0, "Default_glaze_g":0.0, "Notes":""}
+)
 
-        # Preview the preset (do not change inputs yet)
-        if choice != "None":
-            row = ss.form_presets_df.loc[ss.form_presets_df["Form"] == choice].iloc[0]
-            preset_clay_lb = float(row.get("Clay_lb_wet", 0.0))
-            preset_glaze_g = float(row.get("Default_glaze_g", 0.0))
-            note = str(row.get("Notes", "")).strip()
+forms = list(preset_df["Form"]) if not preset_df.empty else []
+choice = st.selectbox("Choose a form", ["None"] + forms, index=0, key="form_choice")
 
-            # Show a little preview card
-            c1, c2, c3 = st.columns([1, 1, 2])
-            with c1:
-                st.metric("Preset clay", f"{preset_clay_lb:.2f} lb")
-            with c2:
-                st.metric("Preset glaze", f"{preset_glaze_g:.0f} g")
-            with c3:
-                if note:
-                    st.caption(note)
+# Preview the preset (do not change inputs yet)
+if choice != "None" and not preset_df.empty:
+    row = preset_df.loc[preset_df["Form"] == choice].iloc[0]
+    preset_clay_lb = float(row.get("Clay_lb_wet", 0.0))
+    preset_glaze_g = float(row.get("Default_glaze_g", 0.0))
+    note = str(row.get("Notes", "")).strip()
+
+    c1, c2, c3 = st.columns([1, 1, 2])
+    with c1:
+        st.metric("Preset clay", f"{preset_clay_lb:.2f} lb")
+    with c2:
+        st.metric("Preset glaze", f"{preset_glaze_g:.0f} g")
+    with c3:
+        if note:
+            st.caption(note)
 
     # right column
     with right:
