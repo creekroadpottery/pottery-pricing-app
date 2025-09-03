@@ -413,8 +413,7 @@ yield_frac = float(ip.get("clay_yield", 1.0))
 effective_lb = throw_weight / max(yield_frac, 1e-9)
 waste_pct = (1.0 - yield_frac) * 100.0
 st.caption(f"You pay for about {effective_lb:.2f} lb of clay per finished piece given {waste_pct:.0f}% loss.")
-
-        ip["packaging_per_piece"] = st.number_input("Packaging per piece", min_value=0.0, value=float(ip["packaging_per_piece"]), step=0.1)
+     ip["packaging_per_piece"] = st.number_input("Packaging per piece", min_value=0.0, value=float(ip["packaging_per_piece"]), step=0.1)
 
         st.subheader("Glaze source")
         glaze_source = st.radio("Glaze cost comes from", ["Recipe tab", "Manual table"], index=0, horizontal=True)
