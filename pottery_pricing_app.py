@@ -223,7 +223,7 @@ tabs = st.tabs([
 ])
 
 # ------------ Per unit ------------
-# ------------- Per unit -------------
+
 with tabs[0]:
     ip = ss.inputs
     left, right = st.columns(2)
