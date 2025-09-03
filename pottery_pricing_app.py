@@ -231,96 +231,45 @@ tabs = st.tabs([
     "Per unit", "Glaze recipe", "Energy", "Labor and overhead",
     "Pricing", "Save and load", "Report", "About"
 ])
+# ------------- Per unit -------------
+with tabs[0]:
+    ip = ss.inputs
+    left, right = st.columns(2)
 
-# left column
-with left:
-    # --- Form preset picker (with options) ---
-    st.subheader("Form preset")
+    # left column
+    with left:
+        # --- Form preset picker (with options) ---
+        st.subheader("Form preset")
 
-    # Safe access to the presets table
-    preset_df = ensure_cols(
-        ss.get("form_presets_df", pd.DataFrame()),
-        {"Form":"", "Clay_lb_wet":0.0, "Default_glaze_g":0.0, "Notes":""}
-    )
+        # Safe access to the presets table
+        preset_df = ensure_cols(
+            ss.get("form_presets_df", pd.DataFrame()),
+            {"Form": "", "Clay_lb_wet": 0.0, "Default_glaze_g": 0.0, "Notes": ""}
+        )
 
-    forms = list(preset_df["Form"]) if not preset_df.empty else []
-    choice = st.selectbox("Choose a form", ["None"] + forms, index=0, key="form_choice")
+        # Build list of choices
+        forms = list(preset_df["Form"]) if not preset_df.empty else []
+        choice = st.selectbox("Choose a form", ["None"] + forms, index=0, key="form_choice")
 
-    # Preview the preset (do not change inputs yet)
-    if choice != "None" and not preset_df.empty:
-        row = preset_df.loc[preset_df["Form"] == choice].iloc[0]
-        preset_clay_lb = float(row.get("Clay_lb_wet", 0.0))
-        preset_glaze_g = float(row.get("Default_glaze_g", 0.0))
-        note = str(row.get("Notes", "")).strip()
+        # Preview the preset (do not change inputs yet)
+        if choice != "None" and not preset_df.empty:
+            row = preset_df.loc[preset_df["Form"] == choice].iloc[0]
+            preset_clay_lb = float(row.get("Clay_lb_wet", 0.0))
+            preset_glaze_g = float(row.get("Default_glaze_g", 0.0))
+            note = str(row.get("Notes", "")).strip()
 
-        c1, c2, c3 = st.columns([1, 1, 2])
-        with c1:
-            st.metric("Preset clay", f"{preset_clay_lb:.2f} lb")
-        with c2:
-            st.metric("Preset glaze", f"{preset_glaze_g:.0f} g")
-        with c3:
-            if note:
-                st.caption(note)
+            # Show a little preview card
+            c1, c2, c3 = st.columns([1, 1, 2])
+            with c1:
+                st.metric("Preset clay", f"{preset_clay_lb:.2f} lb")
+            with c2:
+                st.metric("Preset glaze", f"{preset_glaze_g:.0f} g")
+            with c3:
+                if note:
+                    st.caption(note)
 
-
-    # right column
-    with right:
-        st.subheader("Per piece totals")
-
-        totals = calc_totals(ip, glaze_pp_cost, other_pp)
-        c = st.columns(3)
-        with c[0]:
-            st.metric("Energy", money(totals["energy_pp"]))
-        with c[1]:
-            st.metric("Labor", money(totals["labor_pp"]))
-        with c[2]:
-            st.metric("Overhead", money(totals["oh_pp"]))
-
-        st.metric("Other project materials", money(totals["other_pp"]))
-        st.metric("Total cost per piece", money(totals["total_pp"]))
-
-
-
-    st.caption("Apply the preset exactly or use a quick adjust first.")
-
-    # Quick adjust: percent up or down before applying
-    # Positive raises the preset, negative lowers it
-    adj_pct = st.slider("Adjust preset percent", -30, 30, 0, 1, key="preset_adjust_pct")
-    factor = 1.0 + adj_pct / 100.0
-    adj_clay = round(preset_clay_lb * factor, 3)
-    adj_glaze = round(preset_glaze_g * factor)
-
-    cA, cB, cC = st.columns(3)
-    cA.metric("Adjusted clay", f"{adj_clay:.2f} lb")
-    cB.metric("Adjusted glaze", f"{adj_glaze:.0f} g")
-
-    # Apply buttons
-    apply_both = cC.button("Apply clay and glaze", key="apply_preset_both")
-    apply_clay = cC.button("Apply clay only", key="apply_preset_clay")
-    apply_glaze = cC.button("Apply glaze only", key="apply_preset_glaze")
-
-    if apply_both:
-        ss.inputs["clay_weight_per_piece_lb"] = float(adj_clay)
-        ss.recipe_grams_per_piece = float(adj_glaze)
-        st.success("Applied preset clay and glaze.")
-    elif apply_clay:
-        ss.inputs["clay_weight_per_piece_lb"] = float(adj_clay)
-        st.success("Applied preset clay.")
-    elif apply_glaze:
-        ss.recipe_grams_per_piece = float(adj_glaze)
-        st.success("Applied preset glaze.")
-
-# Optional. Show your current vs preset to learn efficiency
-if choice != "None":
-    cur_clay = float(ss.inputs.get("clay_weight_per_piece_lb", 0.0))
-    if cur_clay > 0 and preset_clay_lb > 0:
-        diff = cur_clay - preset_clay_lb
-        pct = diff / preset_clay_lb * 100.0
-        sign = "more" if diff > 0 else "less"
-        st.caption(f"You are using {abs(diff):.2f} lb ({abs(pct):.1f} percent) {sign} clay than this preset.")
-
+        # --- Clay and packaging ---
         st.subheader("Clay and packaging")
-
         ip["units_made"] = st.number_input("Units in this batch", min_value=1, value=int(ip["units_made"]), step=1)
         ip["clay_price_per_bag"] = st.number_input("Clay price per bag", min_value=0.0, value=float(ip["clay_price_per_bag"]), step=0.5)
         ip["clay_bag_weight_lb"] = st.number_input("Clay bag weight lb", min_value=0.1, value=float(ip["clay_bag_weight_lb"]), step=0.1)
@@ -330,7 +279,7 @@ if choice != "None":
             "Clay yield after trimming and loss",
             min_value=0.5, max_value=1.0,
             value=float(ip.get("clay_yield", 0.9)), step=0.01,
-            help="Fraction of the starting ball that ends up in the piece after trimming and losses. 1.00 means no loss. 0.85 means 15 percent loss."
+            help="Fraction of the starting ball that ends up in the piece after trimming and losses."
         )
 
         throw_weight = float(ip.get("clay_weight_per_piece_lb", 0.0))
@@ -341,6 +290,7 @@ if choice != "None":
 
         ip["packaging_per_piece"] = st.number_input("Packaging per piece", min_value=0.0, value=float(ip["packaging_per_piece"]), step=0.1)
 
+        # --- Glaze source ---
         st.subheader("Glaze source")
         glaze_source = st.radio("Glaze cost comes from", ["Recipe tab", "Manual table"], index=0, horizontal=True)
 
@@ -367,6 +317,17 @@ if choice != "None":
         if "Cost_per_piece" in show_df.columns:
             show_df["Cost_per_piece"] = show_df["Cost_per_piece"].map(money)
         st.dataframe(show_df, use_container_width=True)
+
+    # right column
+    with right:
+        st.subheader("Per piece totals")
+        totals = calc_totals(ip, glaze_pp_cost, 0.0)
+        c = st.columns(3)
+        c[0].metric("Energy", money(totals["energy_pp"]))
+        c[1].metric("Labor", money(totals["labor_pp"]))
+        c[2].metric("Overhead", money(totals["oh_pp"]))
+        st.metric("Total cost per piece", money(totals["total_pp"]))
+
 
         # ---- Other project materials (single table) ----
         st.subheader("Other project materials")
