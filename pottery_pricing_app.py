@@ -435,7 +435,7 @@ with left:
                 key="glaze_piece_editor_front",
             )
             glaze_pp_cost, source_df = glaze_cost_from_piece_table(ss.glaze_piece_df)
-        else:
+    else:
             grams_pp = float(ss.get("recipe_grams_per_piece", 8.0))
             source_df, glaze_pp_cost = glaze_per_piece_from_recipe(ss.catalog_df, ss.recipe_df, grams_pp)
 
