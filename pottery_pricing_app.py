@@ -230,7 +230,7 @@ with tabs[0]:
     # left column
     with left:
         # --- Form preset picker (with options) ---
-st.subheader("Form preset")
+        st.subheader("Form preset")
 
 # Build choices
 forms = list(ss.form_presets_df["Form"]) if not ss.form_presets_df.empty else []
