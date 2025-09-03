@@ -237,7 +237,7 @@ with tabs[0]:
     ip = ss.inputs
     left, right = st.columns(2)
 
-    # left column
+# left column
 with left:
         # --- Form preset picker (with options) ---
 st.subheader("Form preset")
