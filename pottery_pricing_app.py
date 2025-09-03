@@ -224,6 +224,20 @@ for k, v in {
     "pieces_per_gas_firing": ss.inputs.get("pieces_per_gas_firing", 40),
 }.items():
     ss.inputs.setdefault(k, v)
+# Backfill new electric and wood keys if missing
+for k, v in {
+    "kwh_third": 0.0,  # third electric firing (luster etc.)
+    "wood_price_per_cord": 300.0,
+    "wood_price_per_facecord": 120.0,
+    "wood_cords_bisque": 0.0,
+    "wood_cords_glaze": 0.0,
+    "wood_cords_third": 0.0,
+    "wood_facecords_bisque": 0.0,
+    "wood_facecords_glaze": 0.0,
+    "wood_facecords_third": 0.0,
+    "pieces_per_wood_firing": 40,
+}.items():
+    ss.inputs.setdefault(k, v)
 
 # Data defaults
 if "catalog_df" not in ss:
@@ -314,16 +328,36 @@ def glaze_per_piece_from_recipe(catalog_df, recipe_df, grams_per_piece):
 
 # Energy and totals
 def calc_energy(ip):
-    e_cost = (ip["kwh_bisque"] + ip["kwh_glaze"]) * ip["kwh_rate"]
-    e_pp = e_cost / max(1, int(ip["pieces_per_electric_firing"]))
-    gas_firing_cost = 0.0
+    # electric: up to three firings
+    e_cost = (ip.get("kwh_bisque", 0.0) + ip.get("kwh_glaze", 0.0) + ip.get("kwh_third", 0.0)) * ip.get("kwh_rate", 0.0)
+    e_pp = e_cost / max(1, int(ip.get("pieces_per_electric_firing", 40)))
+
+    # fuel choice: Propane, Natural Gas, Wood, or None
     fuel = str(ip.get("fuel_gas", "None")).strip()
+    fuel_pp = 0.0
+
     if fuel == "Propane":
-        gas_firing_cost = ip.get("lp_price_per_gal", 0.0) * (ip.get("lp_gal_bisque", 0.0) + ip.get("lp_gal_glaze", 0.0))
+        gas_firing_cost = ip.get("lp_price_per_gal", 0.0) * (
+            ip.get("lp_gal_bisque", 0.0) + ip.get("lp_gal_glaze", 0.0)
+        )
+        fuel_pp = gas_firing_cost / max(1, int(ip.get("pieces_per_gas_firing", 40)))
+
     elif fuel == "Natural Gas":
-        gas_firing_cost = ip.get("ng_price_per_therm", 0.0) * (ip.get("ng_therms_bisque", 0.0) + ip.get("ng_therms_glaze", 0.0))
-    g_pp = gas_firing_cost / max(1, int(ip.get("pieces_per_gas_firing", 40)))
-    return e_pp + g_pp
+        gas_firing_cost = ip.get("ng_price_per_therm", 0.0) * (
+            ip.get("ng_therms_bisque", 0.0) + ip.get("ng_therms_glaze", 0.0)
+        )
+        fuel_pp = gas_firing_cost / max(1, int(ip.get("pieces_per_gas_firing", 40)))
+
+    elif fuel == "Wood":
+        # allow costs entered as cords and or face cords
+        wood_cost = (
+            ip.get("wood_price_per_cord", 0.0) * (ip.get("wood_cords_bisque", 0.0) + ip.get("wood_cords_glaze", 0.0) + ip.get("wood_cords_third", 0.0))
+            + ip.get("wood_price_per_facecord", 0.0) * (ip.get("wood_facecords_bisque", 0.0) + ip.get("wood_facecords_glaze", 0.0) + ip.get("wood_facecords_third", 0.0))
+        )
+        fuel_pp = wood_cost / max(1, int(ip.get("pieces_per_wood_firing", 40)))
+
+    return e_pp + fuel_pp
+
 
 def calc_totals(ip, glaze_per_piece_cost):
     clay_cost_per_lb = ip["clay_price_per_bag"] / ip["clay_bag_weight_lb"] if ip["clay_bag_weight_lb"] else 0.0
@@ -508,21 +542,25 @@ with tabs[1]:
 with tabs[2]:
     ip = ss.inputs
     col1, col2 = st.columns(2)
+
+    # Electric (now with third firing)
     with col1:
         st.subheader("Electric")
         ip["kwh_rate"] = st.number_input("Rate per kWh", min_value=0.0, value=float(ip.get("kwh_rate", 0.0)), step=0.01)
         ip["kwh_bisque"] = st.number_input("kWh per bisque", min_value=0.0, value=float(ip.get("kwh_bisque", 0.0)), step=1.0)
         ip["kwh_glaze"]  = st.number_input("kWh per glaze",  min_value=0.0, value=float(ip.get("kwh_glaze", 0.0)),  step=1.0)
+        ip["kwh_third"]  = st.number_input("kWh per third firing", min_value=0.0, value=float(ip.get("kwh_third", 0.0)), step=1.0)
         ip["pieces_per_electric_firing"] = st.number_input(
             "Pieces per electric firing", min_value=1, value=int(ip.get("pieces_per_electric_firing", 40)), step=1
         )
 
+    # Fuel: Propane, Natural Gas, Wood
     with col2:
-        st.subheader("Gas")
+        st.subheader("Fuel")
         ip["fuel_gas"] = st.selectbox(
             "Fuel source",
-            ["None", "Propane", "Natural Gas"],
-            index=["None", "Propane", "Natural Gas"].index(str(ip.get("fuel_gas", "None")))
+            ["None", "Propane", "Natural Gas", "Wood"],
+            index=["None", "Propane", "Natural Gas", "Wood"].index(str(ip.get("fuel_gas", "None")))
         )
 
         if ip["fuel_gas"] == "Propane":
@@ -552,11 +590,35 @@ with tabs[2]:
             ip["pieces_per_gas_firing"] = st.number_input(
                 "Pieces per gas firing", min_value=1, value=int(ip.get("pieces_per_gas_firing", 40)), step=1
             )
+
+        elif ip["fuel_gas"] == "Wood":
+            ip["wood_price_per_cord"] = st.number_input(
+                "Wood price per cord", min_value=0.0, value=float(ip.get("wood_price_per_cord", 300.0)), step=1.0
+            )
+            ip["wood_price_per_facecord"] = st.number_input(
+                "Wood price per face cord", min_value=0.0, value=float(ip.get("wood_price_per_facecord", 120.0)), step=1.0
+            )
+
+            st.caption("Enter wood used per firing. You can mix cords and face cords. Face cord is typically one third of a full cord.")
+            cA, cB = st.columns(2)
+            with cA:
+                ip["wood_cords_bisque"] = st.number_input("Cords per bisque", min_value=0.0, value=float(ip.get("wood_cords_bisque", 0.0)), step=0.05)
+                ip["wood_cords_glaze"]  = st.number_input("Cords per glaze",  min_value=0.0, value=float(ip.get("wood_cords_glaze", 0.0)),  step=0.05)
+                ip["wood_cords_third"]  = st.number_input("Cords per third firing", min_value=0.0, value=float(ip.get("wood_cords_third", 0.0)), step=0.05)
+            with cB:
+                ip["wood_facecords_bisque"] = st.number_input("Face cords per bisque", min_value=0.0, value=float(ip.get("wood_facecords_bisque", 0.0)), step=0.1)
+                ip["wood_facecords_glaze"]  = st.number_input("Face cords per glaze",  min_value=0.0, value=float(ip.get("wood_facecords_glaze", 0.0)),  step=0.1)
+                ip["wood_facecords_third"]  = st.number_input("Face cords per third", min_value=0.0, value=float(ip.get("wood_facecords_third", 0.0)), step=0.1)
+
+            ip["pieces_per_wood_firing"] = st.number_input(
+                "Pieces per wood firing", min_value=1, value=int(ip.get("pieces_per_wood_firing", 40)), step=1
+            )
         else:
-            st.caption("No gas costs included.")
+            st.caption("No fuel costs included.")
 
     st.subheader("Per piece energy now")
     st.metric("Energy per piece", money(calc_energy(ip)))
+
 
 # Labor and overhead
 with tabs[3]:
