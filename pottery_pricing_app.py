@@ -200,15 +200,15 @@ def from_json_bytes(b):
 if "inputs" not in ss:
     ss.inputs = dict(
         units_made=1,
-        clay_price_per_bag=25.0,
+        clay_price_per_bag=00.0,
         clay_bag_weight_lb=25.0,
         clay_weight_per_piece_lb=1.0,
         clay_yield=0.9,
         packaging_per_piece=0.5,
-        kwh_rate=0.15, kwh_bisque=30.0, kwh_glaze=35.0, pieces_per_electric_firing=40,
+        kwh_rate=0.15, kwh_bisque=30.0, kwh_glaze=0.0, pieces_per_electric_firing=00,
         gas_rate=2.50, gas_units_bisque=0.0, gas_units_glaze=0.0, pieces_per_gas_firing=40,
-        labor_rate=25.0, hours_per_piece=0.25,
-        overhead_per_month=500.0, pieces_per_month=200,
+        labor_rate=15.0, hours_per_piece=0.25,
+        overhead_per_month=000.0, pieces_per_month=000,
         use_2x2x2=False, wholesale_margin_pct=50, retail_multiplier=2.2,
     )
 
@@ -401,7 +401,20 @@ with tabs[0]:
         ip["clay_price_per_bag"] = st.number_input("Clay price per bag", min_value=0.0, value=float(ip["clay_price_per_bag"]), step=0.5)
         ip["clay_bag_weight_lb"] = st.number_input("Clay bag weight lb", min_value=0.1, value=float(ip["clay_bag_weight_lb"]), step=0.1)
         ip["clay_weight_per_piece_lb"] = st.number_input("Clay weight per piece lb wet", min_value=0.0, value=float(ip["clay_weight_per_piece_lb"]), step=0.1)
-        ip["clay_yield"] = st.slider("Clay yield after trimming and loss", min_value=0.5, max_value=1.0, value=float(ip["clay_yield"]), step=0.01)
+        ip["clay_yield"] = st.slider(
+    "Clay yield after trimming and loss",
+    min_value=0.5, max_value=1.0,
+    value=float(ip.get("clay_yield", 0.9)), step=0.01,
+    help="Fraction of the starting ball that ends up in the piece after trimming and losses. 1.00 means no loss. 0.85 means 15 percent loss."
+)
+
+throw_weight = float(ip.get("clay_weight_per_piece_lb", 0.0))
+yield_frac = float(ip.get("clay_yield", 1.0))
+effective_lb = throw_weight / max(yield_frac, 1e-9)
+waste_pct = (1.0 - yield_frac) * 100.0
+
+st.caption(f"You pay for about {effective_lb:.2f} lb of clay per finished piece given {waste_pct:.0f}% loss.")
+
         ip["packaging_per_piece"] = st.number_input("Packaging per piece", min_value=0.0, value=float(ip["packaging_per_piece"]), step=0.1)
 
         st.subheader("Glaze source")
