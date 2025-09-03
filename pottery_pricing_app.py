@@ -238,7 +238,7 @@ with tabs[0]:
     left, right = st.columns(2)
 
     # left column
-    with left:
+with left:
         # --- Form preset picker (with options) ---
 st.subheader("Form preset")
 
