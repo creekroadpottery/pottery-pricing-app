@@ -479,12 +479,39 @@ ss.other_mat_df = st.data_editor(
     key="other_materials_editor",
 )
 
-other_pp, other_proj_total, other_df = other_materials_pp(ss.other_mat_df, int(ip["units_made"]))
-show_other = other_df.copy()
-show_other["Line_total"] = show_other["Line_total"].map(money)
-show_other["Cost_per_piece"] = show_other["Cost_per_piece"].map(money)
-st.dataframe(show_other, use_container_width=True)
-st.caption(f"Project total {money(other_proj_total)}  •  Adds {money(other_pp)} per piece")
+st.subheader("Other project materials")
+st.caption("Add one-time items for this batch. The cost is divided by the number of pieces in this batch.")
+
+# build table with live calculations inside the editor
+pieces = max(1, int(ip["units_made"]))
+base = ensure_cols(
+    ss.other_mat_df,
+    {"Item":"", "Unit":"", "Cost_per_unit":0.0, "Quantity_for_project":0.0}
+).copy()
+base["Line_total"] = base["Cost_per_unit"] * base["Quantity_for_project"]
+base["Cost_per_piece"] = base["Line_total"] / pieces
+
+ss.other_mat_df = st.data_editor(
+    base,
+    column_config={
+        "Item": st.column_config.TextColumn("Item"),
+        "Unit": st.column_config.TextColumn("Unit"),
+        "Cost_per_unit": st.column_config.NumberColumn("Cost per unit", min_value=0.0, step=0.01),
+        "Quantity_for_project": st.column_config.NumberColumn("Quantity for project", min_value=0.0, step=0.1),
+        "Line_total": st.column_config.NumberColumn("Line total", disabled=True),
+        "Cost_per_piece": st.column_config.NumberColumn("Cost per piece", disabled=True),
+    },
+    num_rows="dynamic",
+    use_container_width=True,
+    key="other_materials_editor",
+)
+
+# compute per-piece add-on for totals
+project_total = float(ss.other_mat_df["Line_total"].sum()) if "Line_total" in ss.other_mat_df else 0.0
+other_pp = project_total / pieces
+
+st.caption(f"Project total {money(project_total)} • Adds {money(other_pp)} per piece")
+
 
 
 with right:
