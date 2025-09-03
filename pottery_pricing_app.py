@@ -40,11 +40,11 @@ def from_json_bytes(b):
 if "inputs" not in ss:
     ss.inputs = dict(
         units_made=1,
-        clay_price_per_bag=25.0,
+        clay_price_per_bag=50.0,
         clay_bag_weight_lb=25.0,
         clay_weight_per_piece_lb=1.0,
         clay_yield=0.9,
-        packaging_per_piece=0.5,
+        packaging_per_piece=0.0,
         kwh_rate=0.15, kwh_bisque=30.0, kwh_glaze=35.0, pieces_per_electric_firing=40,
         gas_rate=2.50, gas_units_bisque=0.0, gas_units_glaze=0.0, pieces_per_gas_firing=40,
         labor_rate=25.0, hours_per_piece=0.25,
@@ -55,7 +55,7 @@ if "inputs" not in ss:
 # backfill energy keys
 for k, v in {
     "fuel_gas": "None",
-    "lp_price_per_gal": 3.50,
+    "lp_price_per_gal": 3.98,
     "lp_gal_bisque": 0.0,
     "lp_gal_glaze": 0.0,
     "ng_price_per_therm": 1.20,
@@ -67,22 +67,22 @@ for k, v in {
 
 if "catalog_df" not in ss:
     ss.catalog_df = pd.DataFrame([
-        {"Material": "Custer Feldspar", "Cost_per_lb": 1.72},
-        {"Material": "Silica 325m",     "Cost_per_lb": 0.82},
-        {"Material": "EPK Kaolin",      "Cost_per_lb": 0.54},
-        {"Material": "Frit 3134",       "Cost_per_lb": 2.04},
+        {"Material": "Enter raw material here.", "Cost_per_lb": 0.00},
+        {"Material": "Enter raw material here.",     "Cost_per_lb": 0.00},
+        {"Material": "Enter raw material here.",      "Cost_per_lb": 0.00},
+        {"Material": "Enter raw material here.",       "Cost_per_lb": 0.00},
     ])
 
 if "recipe_df" not in ss:
     ss.recipe_df = pd.DataFrame([
-        {"Material":"Custer Feldspar","Percent":40.0},
-        {"Material":"Silica 325m","Percent":20.0},
-        {"Material":"EPK Kaolin","Percent":20.0},
-        {"Material":"Frit 3134","Percent":20.0},
+        {"Material":"Enter raw material here.","Percent":00.0},
+        {"Material":"Enter raw material here.","Percent":00.0},
+        {"Material":"Enter raw material here.","Percent":00.0},
+        {"Material":"Enter raw material here.","Percent":00.0},
     ])
 
 if "recipe_grams_per_piece" not in ss:
-    ss.recipe_grams_per_piece = 8.0
+    ss.recipe_grams_per_piece = 124.0
 
 
 # --- Glaze helpers ---
