@@ -396,24 +396,27 @@ with tabs[0]:
     left, right = st.columns(2)
 
     with left:
-        st.subheader("Clay and packaging")
-        ip["units_made"] = st.number_input("Units in this batch", min_value=1, value=int(ip["units_made"]), step=1)
-        ip["clay_price_per_bag"] = st.number_input("Clay price per bag", min_value=0.0, value=float(ip["clay_price_per_bag"]), step=0.5)
-        ip["clay_bag_weight_lb"] = st.number_input("Clay bag weight lb", min_value=0.1, value=float(ip["clay_bag_weight_lb"]), step=0.1)
-        ip["clay_weight_per_piece_lb"] = st.number_input("Clay weight per piece lb wet", min_value=0.0, value=float(ip["clay_weight_per_piece_lb"]), step=0.1)
-        ip["clay_yield"] = st.slider(
-    "Clay yield after trimming and loss",
-    min_value=0.5, max_value=1.0,
-    value=float(ip.get("clay_yield", 0.9)), step=0.01,
-    help="Fraction of the starting ball that ends up in the piece after trimming and losses. 1.00 means no loss. 0.85 means 15 percent loss."
-)
+    st.subheader("Clay and packaging")
 
-throw_weight = float(ip.get("clay_weight_per_piece_lb", 0.0))
-yield_frac = float(ip.get("clay_yield", 1.0))
-effective_lb = throw_weight / max(yield_frac, 1e-9)
-waste_pct = (1.0 - yield_frac) * 100.0
-st.caption(f"You pay for about {effective_lb:.2f} lb of clay per finished piece given {waste_pct:.0f}% loss.")
-     ip["packaging_per_piece"] = st.number_input("Packaging per piece", min_value=0.0, value=float(ip["packaging_per_piece"]), step=0.1)
+    ip["units_made"] = st.number_input("Units in this batch", min_value=1, value=int(ip["units_made"]), step=1)
+    ip["clay_price_per_bag"] = st.number_input("Clay price per bag", min_value=0.0, value=float(ip["clay_price_per_bag"]), step=0.5)
+    ip["clay_bag_weight_lb"] = st.number_input("Clay bag weight lb", min_value=0.1, value=float(ip["clay_bag_weight_lb"]), step=0.1)
+    ip["clay_weight_per_piece_lb"] = st.number_input("Clay weight per piece lb wet", min_value=0.0, value=float(ip["clay_weight_per_piece_lb"]), step=0.1)
+
+    ip["clay_yield"] = st.slider(
+        "Clay yield after trimming and loss",
+        min_value=0.5, max_value=1.0,
+        value=float(ip.get("clay_yield", 0.9)), step=0.01,
+        help="Fraction of the starting ball that ends up in the piece after trimming and losses. 1.00 means no loss. 0.85 means 15 percent loss."
+    )
+
+    throw_weight = float(ip.get("clay_weight_per_piece_lb", 0.0))
+    yield_frac = float(ip.get("clay_yield", 1.0))
+    effective_lb = throw_weight / max(yield_frac, 1e-9)
+    waste_pct = (1.0 - yield_frac) * 100.0
+    st.caption(f"You pay for about {effective_lb:.2f} lb of clay per finished piece given {waste_pct:.0f}% loss.")
+
+    ip["packaging_per_piece"] = st.number_input("Packaging per piece", min_value=0.0, value=float(ip["packaging_per_piece"]), step=0.1)
 
         st.subheader("Glaze source")
         glaze_source = st.radio("Glaze cost comes from", ["Recipe tab", "Manual table"], index=0, horizontal=True)
