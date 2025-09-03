@@ -386,8 +386,9 @@ st.title("Pottery Cost Analysis App")
 
 tabs = st.tabs([
     "Per unit", "Glaze recipe", "Energy", "Labor and overhead",
-    "Pricing", "Compare", "Save and load", "Report", "About"
+    "Pricing", "Save and load", "Report", "About"
 ])
+
 
 # Per unit
 with tabs[0]:
@@ -657,18 +658,9 @@ with tabs[4]:
         c[2].metric("Distributor", money(totals["distributor"]))
     st.metric("Total cost per piece", money(totals["total_pp"]))
 
-# Compare
-with tabs[5]:
-    st.subheader("Compare to your spreadsheet")
-    app_total = calc_totals(ss.inputs, glaze_cost_from_piece_table(ss.glaze_piece_df)[0])["total_pp"]
-    expected = st.number_input("Enter total cost per piece from Excel", min_value=0.0, value=float(app_total), step=0.01)
-    diff = app_total - expected
-    st.write(f"App total {money(app_total)}")
-    st.write(f"Excel total {money(expected)}")
-    st.write(f"Difference {money(diff)}")
 
 # Save and load
-with tabs[6]:
+with tabs[5]:
     st.subheader("Save and load settings")
     state = dict(
         inputs=ss.inputs,
@@ -702,7 +694,7 @@ with tabs[6]:
             st.error(f"Could not load. {e}")
 
 # Report
-with tabs[7]:
+with tabs[6]:
     ip = ss.inputs
     grams_pp = float(ss.get("recipe_grams_per_piece", 8.0))
     _, glaze_pp_from_recipe = glaze_per_piece_from_recipe(ss.catalog_df, ss.recipe_df, grams_pp)
@@ -741,7 +733,7 @@ with tabs[7]:
 
 
 # About
-with tabs[8]:
+with tabs[7]:
     st.subheader("About this app")
     st.markdown("""
 This app was created to help potters understand the true cost of their work.  
