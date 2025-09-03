@@ -783,12 +783,13 @@ with tabs[6]:
 _, glaze_pp_from_recipe = glaze_per_piece_from_recipe(ss.catalog_df, ss.recipe_df, grams_pp)
 other_pp, _, _ = other_materials_pp(ss.other_mat_df, int(ss.inputs["units_made"]))
 totals = calc_totals(ip, glaze_pp_from_recipe, other_pp)
+    
     st.subheader("Per piece totals")
     r = st.columns(3)
-r[0].markdown("Energy " + money(totals["energy_pp"]))
-r[1].markdown("Labor " + money(totals["labor_pp"]))
-r[2].markdown("Overhead " + money(totals["oh_pp"]))
-st.markdown("Other project materials " + money(totals["other_pp"]))
+    r[0].markdown("Energy " + money(totals["energy_pp"]))
+    r[1].markdown("Labor " + money(totals["labor_pp"]))
+    r[2].markdown("Overhead " + money(totals["oh_pp"]))
+    st.markdown("Other project materials " + money(totals["other_pp"]))
 
     r = st.columns(3)
     r[0].markdown("Energy " + money(totals["energy_pp"]))
