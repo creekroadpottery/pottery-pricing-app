@@ -237,8 +237,8 @@ with tabs[0]:
     forms = list(ss.form_presets_df["Form"]) if not ss.form_presets_df.empty else []
     choice = st.selectbox("Choose a form", ["None"] + forms, index=0, key="form_choice")
 
-    # Preview the preset (do not change inputs yet)
-    if choice != "None":
+# Preview the preset (do not change inputs yet)
+if choice != "None":
     row = ss.form_presets_df.loc[ss.form_presets_df["Form"] == choice].iloc[0]
     preset_clay_lb = float(row.get("Clay_lb_wet", 0.0))
     preset_glaze_g = float(row.get("Default_glaze_g", 0.0))
