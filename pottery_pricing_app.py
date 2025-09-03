@@ -503,8 +503,9 @@ ss.other_mat_df = st.data_editor(
     },
     num_rows="dynamic",
     use_container_width=True,
-    key="other_materials_editor",
+    key="other_materials_editor_main",   # <- new unique key
 )
+
 
 # compute per-piece add-on for totals
 project_total = float(ss.other_mat_df["Line_total"].sum()) if "Line_total" in ss.other_mat_df else 0.0
