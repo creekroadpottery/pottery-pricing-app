@@ -411,15 +411,39 @@ with tabs[0]:
 
 # Glaze recipe
 with tabs[1]:
-    st.subheader("Catalog cost per lb")
-    ss.catalog_df = st.data_editor(
-        ensure_cols(ss.catalog_df, {"Material": "", "Cost_per_lb": 0.0}),
-        column_config={
-            "Material": st.column_config.TextColumn("Material"),
-            "Cost_per_lb": st.column_config.NumberColumn("Cost per lb", min_value=0.0, step=0.01),
-        },
-        num_rows="dynamic", use_container_width=True, key="catalog_editor"
-    )
+    st.subheader("Catalog (choose cost unit)")
+    # Unit toggle (stored in session)
+    if "catalog_unit" not in ss:
+        ss.catalog_unit = "lb"
+    ss.catalog_unit = st.radio("Catalog cost unit", ["lb", "kg"], horizontal=True, index=(0 if ss.catalog_unit == "lb" else 1))
+
+    # Editor switches label/column based on unit
+    if ss.catalog_unit == "lb":
+        edited = st.data_editor(
+            ensure_cols(ss.catalog_df, {"Material": "", "Cost_per_lb": 0.0}),
+            column_config={
+                "Material": st.column_config.TextColumn("Material"),
+                "Cost_per_lb": st.column_config.NumberColumn("Cost per lb", min_value=0.0, step=0.01),
+            },
+            num_rows="dynamic", use_container_width=True, key="catalog_editor_lb"
+        )
+        # keep both units in session for other tabs
+        edited = ensure_cols(edited, {"Material": "", "Cost_per_lb": 0.0})
+        edited["Cost_per_kg"] = edited["Cost_per_lb"] * 2.20462
+        ss.catalog_df = edited[["Material", "Cost_per_lb", "Cost_per_kg"]]
+    else:
+        edited = st.data_editor(
+            ensure_cols(ss.catalog_df, {"Material": "", "Cost_per_kg": 0.0}),
+            column_config={
+                "Material": st.column_config.TextColumn("Material"),
+                "Cost_per_kg": st.column_config.NumberColumn("Cost per kg", min_value=0.0, step=0.01),
+            },
+            num_rows="dynamic", use_container_width=True, key="catalog_editor_kg"
+        )
+        # keep both units in session for other tabs
+        edited = ensure_cols(edited, {"Material": "", "Cost_per_kg": 0.0})
+        edited["Cost_per_lb"] = edited["Cost_per_kg"] / 2.20462
+        ss.catalog_df = edited[["Material", "Cost_per_lb", "Cost_per_kg"]]
 
     st.subheader("Recipe in percent")
     ss.recipe_df = st.data_editor(
@@ -431,7 +455,8 @@ with tabs[1]:
         num_rows="dynamic", use_container_width=True, key="recipe_editor"
     )
 
-    colA, colB = st.columns([2,1])
+    # Batch size input with unit choice and typing
+    colA, colB = st.columns([2, 1])
     with colA:
         batch_str = st.text_input("Batch size", value="100")
     with colB:
@@ -450,9 +475,11 @@ with tabs[1]:
         batch_g = batch_val * 28.3495
     else:
         batch_g = batch_val * 453.592
+
     if batch_g <= 0:
         st.warning("Enter a positive batch size")
 
+    # Use existing helper; it expects Cost_per_lb, which we keep updated above
     out, batch_total, cpg, cpo, cpl = percent_recipe_table(ss.catalog_df, ss.recipe_df, batch_g)
 
     st.caption(f"Batch size {batch_g:.0f} g  •  {batch_g/28.3495:.2f} oz  •  {batch_g/453.592:.3f} lb")
@@ -468,12 +495,15 @@ with tabs[1]:
     col4, col5 = st.columns(2)
     col4.metric("Cost per pound", money(cpl))
 
+    # Grams per piece as typed input
     grams_str = st.text_input("Grams used per piece", value=str(ss.get("recipe_grams_per_piece", 8.0)))
     try:
         ss.recipe_grams_per_piece = float(grams_str)
     except ValueError:
         st.warning("Please enter a number")
+
     st.metric("Glaze cost per piece from this recipe", money(cpg * ss.recipe_grams_per_piece))
+
 # Energy
 with tabs[2]:
     ip = ss.inputs
