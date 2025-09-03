@@ -712,7 +712,8 @@ else:
 other_pp, _, _ = other_materials_pp(ss.other_mat_df, 
     int(ss.inputs["units_made"]))
 totals = calc_totals(ip, glaze_pp_cost, other_pp)
-st.subheader("Results")
+
+  st.subheader("Results")
 
 c = st.columns(3)
 c[0].metric("Wholesale", money(totals["wholesale"]))
