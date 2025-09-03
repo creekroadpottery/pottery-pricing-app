@@ -85,7 +85,7 @@ if "recipe_df" not in ss:
     ])
 
 if "recipe_grams_per_piece" not in ss:
-    ss.recipe_grams_per_piece = 8.0
+    ss.recipe_grams_per_piece = 124.0
 
 if "glaze_piece_df" not in ss:
     ss.glaze_piece_df = pd.DataFrame([
