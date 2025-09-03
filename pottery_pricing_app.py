@@ -233,26 +233,26 @@ with tabs[0]:
         # --- Form preset picker (with options) ---
         st.subheader("Form preset")
 
-        # Build choices
-        forms = list(ss.form_presets_df["Form"]) if not ss.form_presets_df.empty else []
-        choice = st.selectbox("Choose a form", ["None"] + forms, index=0, key="form_choice")
+    # Build choices
+    forms = list(ss.form_presets_df["Form"]) if not ss.form_presets_df.empty else []
+    choice = st.selectbox("Choose a form", ["None"] + forms, index=0, key="form_choice")
 
-        # Preview the preset (do not change inputs yet)
-        if choice != "None":
-            row = ss.form_presets_df.loc[ss.form_presets_df["Form"] == choice].iloc[0]
-            preset_clay_lb = float(row.get("Clay_lb_wet", 0.0))
-            preset_glaze_g = float(row.get("Default_glaze_g", 0.0))
-            note = str(row.get("Notes", "")).strip()
+    # Preview the preset (do not change inputs yet)
+    if choice != "None":
+    row = ss.form_presets_df.loc[ss.form_presets_df["Form"] == choice].iloc[0]
+    preset_clay_lb = float(row.get("Clay_lb_wet", 0.0))
+    preset_glaze_g = float(row.get("Default_glaze_g", 0.0))
+    note = str(row.get("Notes", "")).strip()
 
-            # Show a little preview card
-            c1, c2, c3 = st.columns([1, 1, 2])
-            with c1:
-                st.metric("Preset clay", f"{preset_clay_lb:.2f} lb")
-            with c2:
-                st.metric("Preset glaze", f"{preset_glaze_g:.0f} g")
-            with c3:
-                if note:
-                    st.caption(note)
+    # Show a little preview card
+    c1, c2, c3 = st.columns([1, 1, 2])
+    with c1:
+    st.metric("Preset clay", f"{preset_clay_lb:.2f} lb")
+    with c2:
+    st.metric("Preset glaze", f"{preset_glaze_g:.0f} g")
+    with c3:
+    if note:
+    st.caption(note)
 
 
     st.caption("Apply the preset exactly or use a quick adjust first.")
