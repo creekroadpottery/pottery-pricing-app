@@ -1,4 +1,4 @@
-import streamlit as st
+Aimport streamlit as st
 import pandas as pd
 import json
 
@@ -61,11 +61,7 @@ if "inputs" not in ss:
         overhead_per_month=500.0, pieces_per_month=200,
         use_2x2x2=False, wholesale_margin_pct=50, retail_multiplier=2.2,
     )
-# Other project materials (free-form list)
-if "other_mat_df" not in ss:
-    ss.other_mat_df = pd.DataFrame([
-        {"Item":"Hand pump","Unit":"each","Cost_per_unit":0.85,"Quantity_for_project":16.0},
-    ])
+
 
 # backfill energy keys
 for k, v in {
@@ -279,7 +275,13 @@ if "glaze_piece_df" not in ss:
         {"Material":"Frit 3134","Cost_per_lb":2.04,"Grams_per_piece":5.0},
         {"Material":"EPK Kaolin","Cost_per_lb":0.54,"Grams_per_piece":3.0},
     ])
-
+    
+# Other project materials (free-form list)
+if "other_mat_df" not in ss:
+    ss.other_mat_df = pd.DataFrame([
+        {"Item":"Hand pump","Unit":"each","Cost_per_unit":0.85,"Quantity_for_project":16.0},
+    ])
+    
 # Glaze helpers
 def glaze_cost_from_piece_table(df):
     gdf = ensure_cols(df, {"Material": "", "Cost_per_lb": 0.0, "Grams_per_piece": 0.0}).copy()
