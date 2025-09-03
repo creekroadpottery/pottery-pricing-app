@@ -222,8 +222,7 @@ tabs = st.tabs([
     "Pricing", "Save and load", "Report", "About"
 ])
 
-# ------------ Per unit ------------
-
+# ------------- Per unit -------------
 with tabs[0]:
     ip = ss.inputs
     left, right = st.columns(2)
@@ -233,26 +232,43 @@ with tabs[0]:
         # --- Form preset picker (with options) ---
         st.subheader("Form preset")
 
-    # Build choices
-    forms = list(ss.form_presets_df["Form"]) if not ss.form_presets_df.empty else []
-    choice = st.selectbox("Choose a form", ["None"] + forms, index=0, key="form_choice")
+        # Build choices
+        forms = list(ss.form_presets_df["Form"]) if not ss.form_presets_df.empty else []
+        choice = st.selectbox("Choose a form", ["None"] + forms, index=0, key="form_choice")
 
-# Preview the preset (do not change inputs yet)
-if choice != "None":
-    row = ss.form_presets_df.loc[ss.form_presets_df["Form"] == choice].iloc[0]
-    preset_clay_lb = float(row.get("Clay_lb_wet", 0.0))
-    preset_glaze_g = float(row.get("Default_glaze_g", 0.0))
-    note = str(row.get("Notes", "")).strip()
+        # Preview the preset (do not change inputs yet)
+        if choice != "None":
+            row = ss.form_presets_df.loc[ss.form_presets_df["Form"] == choice].iloc[0]
+            preset_clay_lb = float(row.get("Clay_lb_wet", 0.0))
+            preset_glaze_g = float(row.get("Default_glaze_g", 0.0))
+            note = str(row.get("Notes", "")).strip()
 
-    # Show a little preview card
-    c1, c2, c3 = st.columns([1, 1, 2])
-    with c1:
-    st.metric("Preset clay", f"{preset_clay_lb:.2f} lb")
-    with c2:
-    st.metric("Preset glaze", f"{preset_glaze_g:.0f} g")
-    with c3:
-    if note:
-    st.caption(note)
+            # Show a little preview card
+            c1, c2, c3 = st.columns([1, 1, 2])
+            with c1:
+                st.metric("Preset clay", f"{preset_clay_lb:.2f} lb")
+            with c2:
+                st.metric("Preset glaze", f"{preset_glaze_g:.0f} g")
+            with c3:
+                if note:
+                    st.caption(note)
+
+    # right column
+    with right:
+        st.subheader("Per piece totals")
+
+        totals = calc_totals(ip, glaze_pp_cost, other_pp)
+        c = st.columns(3)
+        with c[0]:
+            st.metric("Energy", money(totals["energy_pp"]))
+        with c[1]:
+            st.metric("Labor", money(totals["labor_pp"]))
+        with c[2]:
+            st.metric("Overhead", money(totals["oh_pp"]))
+
+        st.metric("Other project materials", money(totals["other_pp"]))
+        st.metric("Total cost per piece", money(totals["total_pp"]))
+
 
 
     st.caption("Apply the preset exactly or use a quick adjust first.")
