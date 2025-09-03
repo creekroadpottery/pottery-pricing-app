@@ -487,7 +487,7 @@ st.dataframe(show_other, use_container_width=True)
 st.caption(f"Project total {money(other_proj_total)}  •  Adds {money(other_pp)} per piece")
 
 
-    with right:
+with right:
         st.subheader("Per piece totals")
         totals = calc_totals(ip, glaze_pp_cost, other_pp)
         c = st.columns(3)
