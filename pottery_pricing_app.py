@@ -34,10 +34,19 @@ def to_json_bytes(obj):
 def from_json_bytes(b):
     return json.loads(b.decode("utf-8"))
 
+# Other project materials – make sure it exists
+if "other_mat_df" not in ss:
+    ss.other_mat_df = pd.DataFrame(
+        columns=["Item", "Unit", "Cost_per_unit", "Quantity_for_project"]
+    )
+
+
 def other_materials_pp(df, pieces_in_project: int):
-    df2 = ensure_cols(df, {
-        "Item":"", "Unit":"", "Cost_per_unit":0.0, "Quantity_for_project":0.0
-    }).copy()
+    other_mat_df = ensure_cols(
+    ss.get("other_mat_df", pd.DataFrame()),
+    {"Item": "", "Unit": "", "Cost_per_unit": 0.0, "Quantity_for_project": 0.0}
+).to_dict(orient="list"),
+
     df2["Line_total"] = df2["Cost_per_unit"] * df2["Quantity_for_project"]
     project_total = float(df2["Line_total"].sum())
     per_piece = project_total / max(1, int(pieces_in_project))
