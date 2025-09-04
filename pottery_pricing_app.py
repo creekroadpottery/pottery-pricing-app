@@ -209,6 +209,63 @@ def glaze_per_piece_from_recipe(catalog_df, recipe_df, grams_per_piece):
     df = pd.DataFrame(rows)
     return df, float(total_cost_pp)
 
+def shrink_widget():
+    # defaults
+    ss.setdefault("shrink_rate_pct", 12.0)
+    ss.setdefault("shrink_units", "in")
+    ss.setdefault("shrink_wet_size", 10.0)
+    ss.setdefault("shrink_target_size", 9.0)
+
+    st.subheader("Shrink rate")
+    # quick presets
+    preset = st.selectbox(
+        "Choose a shrink rate",
+        ["8", "10", "12", "14", "16", "18", "Custom"],
+        index=["8","10","12","14","16","18","Custom"].index(str(int(ss.shrink_rate_pct)) if ss.shrink_rate_pct in [8,10,12,14,16,18] else "Custom"),
+        help="Pick a common rate or select Custom."
+    )
+    if preset != "Custom":
+        ss.shrink_rate_pct = float(preset)
+    else:
+        ss.shrink_rate_pct = st.number_input("Custom shrink rate percent", 0.0, 25.0, float(ss.shrink_rate_pct), 0.1)
+
+    # small status line
+    st.caption(f"Using shrink rate {ss.shrink_rate_pct:.1f} percent")
+
+    with st.expander("Shrink calculators"):
+        cols = st.columns([1,1,1])
+        with cols[0]:
+            ss.shrink_units = st.selectbox("Units", ["in", "cm"], index=0 if ss.shrink_units=="in" else 1)
+
+        # forward: wet -> finished
+        with cols[1]:
+            ss.shrink_wet_size = st.number_input(
+                f"Wet size ({ss.shrink_units})", min_value=0.0, value=float(ss.shrink_wet_size), step=0.01
+            )
+        finished = ss.shrink_wet_size * (1.0 - ss.shrink_rate_pct/100.0)
+
+        # reverse: finished target -> wet
+        with cols[2]:
+            ss.shrink_target_size = st.number_input(
+                f"Target finished size ({ss.shrink_units})", min_value=0.0, value=float(ss.shrink_target_size), step=0.01
+            )
+        needed_wet = ss.shrink_target_size / max(1e-9, 1.0 - ss.shrink_rate_pct/100.0)
+
+        m1, m2 = st.columns(2)
+        m1.metric("Finished size", f"{finished:.3f} {ss.shrink_units}")
+        m2.metric("Wet needed for target", f"{needed_wet:.3f} {ss.shrink_units}")
+
+        # optional lid helper
+        st.caption("Lid remake helper")
+        lc1, lc2, lc3 = st.columns([1,1,1])
+        rate = ss.shrink_rate_pct/100.0
+        fired_rim_od = lc1.number_input(f"Fired rim outside diameter ({ss.shrink_units})", min_value=0.0, value=3.00, step=0.01)
+        default_clearance = 0.03 if ss.shrink_units == "in" else 0.8
+        clearance = lc2.number_input(f"Extra diameter for clearance ({ss.shrink_units})", min_value=0.0, value=default_clearance, step=0.01)
+        wet_gallery_id_needed = (fired_rim_od + clearance) / max(1e-9, 1.0 - rate)
+        lc3.metric("Wet gallery inner diameter", f"{wet_gallery_id_needed:.3f} {ss.shrink_units}")
+
+
 # ------------ Energy and totals ------------
 def calc_energy(ip):
     e_cost = (ip.get("kwh_bisque", 0.0) + ip.get("kwh_glaze", 0.0) + ip.get("kwh_third", 0.0)) * ip.get("kwh_rate", 0.0)
@@ -302,6 +359,7 @@ with tabs[0]:
                 if note:
                     st.caption(note)
 
+
         # --- Clay and packaging ---
         st.subheader("Clay and packaging")
         ip["units_made"] = st.number_input("Units in this batch", min_value=1, value=int(ip["units_made"]), step=1)
@@ -325,6 +383,7 @@ with tabs[0]:
         ip["packaging_per_piece"] = st.number_input("Packaging per piece", min_value=0.0, value=float(ip["packaging_per_piece"]), step=0.1)
 
         # inside: with tabs[0]:  ...  with left:  ...
+
 shrink_widget()   # <- adds the dropdown + calculators here only
 
         # --- Glaze source ---
@@ -413,62 +472,6 @@ shrink_widget()   # <- adds the dropdown + calculators here only
 
         st.metric("Other project materials", money(totals["other_pp"]))
         st.metric("Total cost per piece", money(totals["total_pp"]))
-
-def shrink_widget():
-    # defaults
-    ss.setdefault("shrink_rate_pct", 12.0)
-    ss.setdefault("shrink_units", "in")
-    ss.setdefault("shrink_wet_size", 10.0)
-    ss.setdefault("shrink_target_size", 9.0)
-
-    st.subheader("Shrink rate")
-    # quick presets
-    preset = st.selectbox(
-        "Choose a shrink rate",
-        ["8", "10", "12", "14", "16", "18", "Custom"],
-        index=["8","10","12","14","16","18","Custom"].index(str(int(ss.shrink_rate_pct)) if ss.shrink_rate_pct in [8,10,12,14,16,18] else "Custom"),
-        help="Pick a common rate or select Custom."
-    )
-    if preset != "Custom":
-        ss.shrink_rate_pct = float(preset)
-    else:
-        ss.shrink_rate_pct = st.number_input("Custom shrink rate percent", 0.0, 25.0, float(ss.shrink_rate_pct), 0.1)
-
-    # small status line
-    st.caption(f"Using shrink rate {ss.shrink_rate_pct:.1f} percent")
-
-    with st.expander("Shrink calculators"):
-        cols = st.columns([1,1,1])
-        with cols[0]:
-            ss.shrink_units = st.selectbox("Units", ["in", "cm"], index=0 if ss.shrink_units=="in" else 1)
-
-        # forward: wet -> finished
-        with cols[1]:
-            ss.shrink_wet_size = st.number_input(
-                f"Wet size ({ss.shrink_units})", min_value=0.0, value=float(ss.shrink_wet_size), step=0.01
-            )
-        finished = ss.shrink_wet_size * (1.0 - ss.shrink_rate_pct/100.0)
-
-        # reverse: finished target -> wet
-        with cols[2]:
-            ss.shrink_target_size = st.number_input(
-                f"Target finished size ({ss.shrink_units})", min_value=0.0, value=float(ss.shrink_target_size), step=0.01
-            )
-        needed_wet = ss.shrink_target_size / max(1e-9, 1.0 - ss.shrink_rate_pct/100.0)
-
-        m1, m2 = st.columns(2)
-        m1.metric("Finished size", f"{finished:.3f} {ss.shrink_units}")
-        m2.metric("Wet needed for target", f"{needed_wet:.3f} {ss.shrink_units}")
-
-        # optional lid helper
-        st.caption("Lid remake helper")
-        lc1, lc2, lc3 = st.columns([1,1,1])
-        rate = ss.shrink_rate_pct/100.0
-        fired_rim_od = lc1.number_input(f"Fired rim outside diameter ({ss.shrink_units})", min_value=0.0, value=3.00, step=0.01)
-        default_clearance = 0.03 if ss.shrink_units == "in" else 0.8
-        clearance = lc2.number_input(f"Extra diameter for clearance ({ss.shrink_units})", min_value=0.0, value=default_clearance, step=0.01)
-        wet_gallery_id_needed = (fired_rim_od + clearance) / max(1e-9, 1.0 - rate)
-        lc3.metric("Wet gallery inner diameter", f"{wet_gallery_id_needed:.3f} {ss.shrink_units}")
 
 
 
