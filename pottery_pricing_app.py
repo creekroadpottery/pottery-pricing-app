@@ -481,7 +481,8 @@ with left:
         min_value=0.0, max_value=30.0,
         value=float(ss.shrink_rate_pct), step=0.1,
         help="Overall linear shrink from wet to fired. 12 means 12 percent.",
-       # compute from a quick test tile
+       
+      # compute from a quick test tile
     st.markdown("**Compute from test tile**")
     c1, c2, c3 = st.columns([1, 1, 1])
     wet_len = c1.number_input("Wet length", min_value=0.0, value=10.0, step=0.1)
