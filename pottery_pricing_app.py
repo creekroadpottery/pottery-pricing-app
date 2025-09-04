@@ -324,6 +324,9 @@ with tabs[0]:
 
         ip["packaging_per_piece"] = st.number_input("Packaging per piece", min_value=0.0, value=float(ip["packaging_per_piece"]), step=0.1)
 
+        # inside: with tabs[0]:  ...  with left:  ...
+shrink_widget()   # <- adds the dropdown + calculators here only
+
         # --- Glaze source ---
         st.subheader("Glaze source")
         glaze_source = st.radio("Glaze cost comes from", ["Recipe tab", "Manual table"], index=0, horizontal=True)
@@ -410,9 +413,6 @@ with tabs[0]:
 
         st.metric("Other project materials", money(totals["other_pp"]))
         st.metric("Total cost per piece", money(totals["total_pp"]))
-
-# inside: with tabs[0]:  ...  with left:  ...
-shrink_widget()   # <- adds the dropdown + calculators here only
 
 def shrink_widget():
     # defaults
