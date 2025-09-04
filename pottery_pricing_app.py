@@ -473,8 +473,9 @@ with left:
 
         st.metric("Other project materials", money(totals["other_pp"]))
         st.metric("Total cost per piece", money(totals["total_pp"]))
-        with st.expander("Shrink rate helper"):
-    # current shrink setting
+        
+    with st.expander("Shrink rate helper"):
+       # current shrink setting
         ss.shrink_rate_pct = st.number_input(
         "Shrink percent",
         min_value=0.0, max_value=30.0,
