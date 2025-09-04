@@ -433,7 +433,7 @@ with left:
         pieces = max(1, int(ip["units_made"]))
         base = ensure_cols(
             ss.other_mat_df,
-            {"Item":"Beer", "Unit":"24", "Cost_per_unit":22.99, "Quantity_for_project":24.0}
+            {"Item":"", "Unit":"", "Cost_per_unit":0.0, "Quantity_for_project":0.0}
         ).copy()
         base["Line_total"] = base["Cost_per_unit"] * base["Quantity_for_project"]
         base["Cost_per_piece"] = base["Line_total"] / pieces
@@ -498,36 +498,25 @@ with left:
             ss.shrink_rate_pct = calc_pct
             rate = ss.shrink_rate_pct / 100.0
             st.success(f"Shrink percent set to {calc_pct:.2f}%")
-
-    st.divider()
-
     # unit choice for the size calculators
     ss.shrink_units = st.radio("Units", ["in", "mm"], index=(0 if ss.shrink_units == "in" else 1), horizontal=True)
-
     # wet -> fired, fired -> wet
     st.markdown("**Size converter**")
     sc1, sc2, sc3 = st.columns([1, 1, 1])
     wet_size = sc1.number_input(f"Wet size ({ss.shrink_units})", min_value=0.0, value=4.00, step=0.01)
     fired_size_target = sc2.number_input(f"Target fired size ({ss.shrink_units})", min_value=0.0, value=3.52, step=0.01)
-
     fired_from_wet = wet_size * (1.0 - rate)
     wet_needed_for_target = fired_size_target / max(1e-9, 1.0 - rate)
-
     sc3.metric("Fired from wet", f"{fired_from_wet:.3f} {ss.shrink_units}")
     st.caption(f"To end at {fired_size_target:.3f} {ss.shrink_units}, throw about {wet_needed_for_target:.3f} {ss.shrink_units} wet.")
-
-    st.divider()
-
     # lid remake helper
     st.markdown("**Lid remake helper**")
     st.caption("Measure the fired rim outside diameter on the pot. Choose a small clearance to keep the fit comfortable.")
     lc1, lc2, lc3 = st.columns([1, 1, 1])
-
     fired_rim_od = lc1.number_input(f"Fired rim outside diameter ({ss.shrink_units})", min_value=0.0, value=3.00, step=0.01)
     clearance = lc2.number_input(f"Extra diameter for clearance ({ss.shrink_units})", min_value=0.0, value=(0.03 if ss.shrink_units == 'in' else 0.8), step=0.01)
     wet_gallery_id_needed = (fired_rim_od + clearance) / max(1e-9, 1.0 - rate)
     lc3.metric("Wet gallery inner diameter to throw", f"{wet_gallery_id_needed:.3f} {ss.shrink_units}")
-
     # reverse check
     st.caption("Reverse check if you already threw a lid:")
     lid_wet_id = st.number_input(f"Wet gallery inner diameter you threw ({ss.shrink_units})", min_value=0.0, value=wet_gallery_id_needed, step=0.01)
