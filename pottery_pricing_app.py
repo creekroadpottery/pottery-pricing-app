@@ -98,7 +98,7 @@ from pathlib import Path
 if "form_presets_df" not in ss:
     try:
         # adjust the path if you put the file in a folder like data/form_presets.csv
-        presets_path = Path("form_presets.csv")
+        presets_path = Path("https://github.com/creekroadpottery/pottery-pricing-app/blob/main/form_presets.csv")
         df = pd.read_csv(presets_path)
 
         # make sure columns exist and in the right order
