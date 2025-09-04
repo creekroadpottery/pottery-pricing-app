@@ -1,5 +1,3 @@
-
-
 import streamlit as st
 import pandas as pd
 import json
@@ -36,44 +34,21 @@ def to_json_bytes(obj):
 def from_json_bytes(b):
     return json.loads(b.decode("utf-8"))
 
-# Other project materials – make sure it exists
-if "other_mat_df" not in ss:
-    ss.other_mat_df = pd.DataFrame(
-        columns=["Item", "Unit", "Cost_per_unit", "Quantity_for_project"]
-    )
-
-
 def other_materials_pp(df, pieces_in_project: int):
-    """
-    Returns:
-      per_piece_cost, project_total, dataframe_with_Line_total_and_Cost_per_piece
-    Always safe with empty / malformed input.
-    """
-    base = ensure_cols(
-        df if isinstance(df, pd.DataFrame) else pd.DataFrame(),
-        {"Item": "", "Unit": "", "Cost_per_unit": 0.0, "Quantity_for_project": 0.0}
-    ).copy()
-
-    # numeric cleanup
-    base["Cost_per_unit"] = pd.to_numeric(base["Cost_per_unit"], errors="coerce").fillna(0.0)
-    base["Quantity_for_project"] = pd.to_numeric(base["Quantity_for_project"], errors="coerce").fillna(0.0)
-
-    # totals
-    base["Line_total"] = base["Cost_per_unit"] * base["Quantity_for_project"]
-    pieces = max(1, int(pieces_in_project or 0))
-    base["Cost_per_piece"] = base["Line_total"] / pieces
-
-    project_total = float(base["Line_total"].sum()) if "Line_total" in base else 0.0
-    per_piece = project_total / pieces
-    return per_piece, project_total, base
-
+    df2 = ensure_cols(df, {
+        "Item":"", "Unit":"", "Cost_per_unit":0.0, "Quantity_for_project":0.0
+    }).copy()
+    df2["Line_total"] = df2["Cost_per_unit"] * df2["Quantity_for_project"]
+    project_total = float(df2["Line_total"].sum())
+    per_piece = project_total / max(1, int(pieces_in_project))
+    df2["Cost_per_piece"] = df2["Line_total"] / max(1, int(pieces_in_project))
+    return per_piece, project_total, df2
 
 # ------------ Session defaults ------------
 if "shrink_rate_pct" not in ss:
-    ss.shrink_rate_pct = 14.0   # typical stoneware range 10 to 15
+    ss.shrink_rate_pct = 12.0   # typical stoneware range 10 to 15
 if "shrink_units" not in ss:
     ss.shrink_units = "in"
-
 
 if "inputs" not in ss:
     ss.inputs = dict(
@@ -115,38 +90,18 @@ if "recipe_df" not in ss:
     ])
 
 if "recipe_grams_per_piece" not in ss:
-    ss.recipe_grams_per_piece = 124.0
+    ss.recipe_grams_per_piece = 8.0
 
 if "glaze_piece_df" not in ss:
     ss.glaze_piece_df = pd.DataFrame([
         {"Material":"Frit 3134","Cost_per_lb":0.00,"Grams_per_piece":0.0},
     ])
 
-# --- Form presets loader (cached) ---
-@st.cache_data(show_spinner=False)
-def load_form_presets():
-    url = "https://raw.githubusercontent.com/creekroadpottery/pottery-pricing-app/main/form_presets.csv"
-    try:
-        df = pd.read_csv(url)
-        return ensure_cols(df, {"Form": "", "Clay_lb_wet": 0.0, "Default_glaze_g": 0.0, "Notes": ""})
-    except Exception:
-        # fallback if CSV is missing or network issue
-        return pd.DataFrame(
-            [
-                {"Form": "Mug",         "Clay_lb_wet": 0.90, "Default_glaze_g": 40,  "Notes": "12 oz straight"},
-                {"Form": "Bowl cereal", "Clay_lb_wet": 1.25, "Default_glaze_g": 55,  "Notes": "about 6 in"},
-                {"Form": "Plate 10 in", "Clay_lb_wet": 2.50, "Default_glaze_g": 110, "Notes": "dinner"},
-            ],
-            columns=["Form", "Clay_lb_wet", "Default_glaze_g", "Notes"]
-        )
-
-if "form_presets_df" not in ss:
-    ss.form_presets_df = load_form_presets()
-
-
-
-    
-
+# other materials default
+if "other_mat_df" not in ss:
+    ss.other_mat_df = pd.DataFrame([
+        {"Item":"Hand pump","Unit":"each","Cost_per_unit":0.85,"Quantity_for_project":16.0},
+    ])
 
 # ------------ Glaze helpers ------------
 def glaze_cost_from_piece_table(df):
@@ -208,63 +163,6 @@ def glaze_per_piece_from_recipe(catalog_df, recipe_df, grams_per_piece):
     df = pd.DataFrame(rows)
     return df, float(total_cost_pp)
 
-def shrink_widget():
-    # defaults
-    ss.setdefault("shrink_rate_pct", 12.0)
-    ss.setdefault("shrink_units", "in")
-    ss.setdefault("shrink_wet_size", 10.0)
-    ss.setdefault("shrink_target_size", 9.0)
-
-    st.subheader("Shrink rate")
-    # quick presets
-    preset = st.selectbox(
-        "Choose a shrink rate",
-        ["8", "10", "12", "14", "16", "18", "Custom"],
-        index=["8","10","12","14","16","18","Custom"].index(str(int(ss.shrink_rate_pct)) if ss.shrink_rate_pct in [8,10,12,14,16,18] else "Custom"),
-        help="Pick a common rate or select Custom."
-    )
-    if preset != "Custom":
-        ss.shrink_rate_pct = float(preset)
-    else:
-        ss.shrink_rate_pct = st.number_input("Custom shrink rate percent", 0.0, 25.0, float(ss.shrink_rate_pct), 0.1)
-
-    # small status line
-    st.caption(f"Using shrink rate {ss.shrink_rate_pct:.1f} percent")
-
-    with st.expander("Shrink calculators"):
-        cols = st.columns([1,1,1])
-        with cols[0]:
-            ss.shrink_units = st.selectbox("Units", ["in", "cm"], index=0 if ss.shrink_units=="in" else 1)
-
-        # forward: wet -> finished
-        with cols[1]:
-            ss.shrink_wet_size = st.number_input(
-                f"Wet size ({ss.shrink_units})", min_value=0.0, value=float(ss.shrink_wet_size), step=0.01
-            )
-        finished = ss.shrink_wet_size * (1.0 - ss.shrink_rate_pct/100.0)
-
-        # reverse: finished target -> wet
-        with cols[2]:
-            ss.shrink_target_size = st.number_input(
-                f"Target finished size ({ss.shrink_units})", min_value=0.0, value=float(ss.shrink_target_size), step=0.01
-            )
-        needed_wet = ss.shrink_target_size / max(1e-9, 1.0 - ss.shrink_rate_pct/100.0)
-
-        m1, m2 = st.columns(2)
-        m1.metric("Finished size", f"{finished:.3f} {ss.shrink_units}")
-        m2.metric("Wet needed for target", f"{needed_wet:.3f} {ss.shrink_units}")
-
-        # optional lid helper
-        st.caption("Lid remake helper")
-        lc1, lc2, lc3 = st.columns([1,1,1])
-        rate = ss.shrink_rate_pct/100.0
-        fired_rim_od = lc1.number_input(f"Fired rim outside diameter ({ss.shrink_units})", min_value=0.0, value=3.00, step=0.01)
-        default_clearance = 0.03 if ss.shrink_units == "in" else 0.8
-        clearance = lc2.number_input(f"Extra diameter for clearance ({ss.shrink_units})", min_value=0.0, value=default_clearance, step=0.01)
-        wet_gallery_id_needed = (fired_rim_od + clearance) / max(1e-9, 1.0 - rate)
-        lc3.metric("Wet gallery inner diameter", f"{wet_gallery_id_needed:.3f} {ss.shrink_units}")
-
-
 # ------------ Energy and totals ------------
 def calc_energy(ip):
     e_cost = (ip.get("kwh_bisque", 0.0) + ip.get("kwh_glaze", 0.0) + ip.get("kwh_third", 0.0)) * ip.get("kwh_rate", 0.0)
@@ -321,112 +219,62 @@ tabs = st.tabs([
     "Per unit", "Glaze recipe", "Energy", "Labor and overhead",
     "Pricing", "Save and load", "Report", "About"
 ])
-# ------------- Per unit -------------
+
+# ------------ Per unit ------------
 with tabs[0]:
     ip = ss.inputs
     left, right = st.columns(2)
 
     # left column
-with left:
-  # --- Form preset picker (with options) ---
-    st.subheader("Form preset")
+    with left:
+        st.subheader("Clay and packaging")
 
-    preset_df = ensure_cols(
-        ss.get("form_presets_df", pd.DataFrame()),
-        {"Form": "", "Clay_lb_wet": 0.0, "Default_glaze_g": 0.0, "Notes": ""}
-    )
+        ip["units_made"] = st.number_input("Units in this batch", min_value=1, value=int(ip["units_made"]), step=1)
+        ip["clay_price_per_bag"] = st.number_input("Clay price per bag", min_value=0.0, value=float(ip["clay_price_per_bag"]), step=0.5)
+        ip["clay_bag_weight_lb"] = st.number_input("Clay bag weight lb", min_value=0.1, value=float(ip["clay_bag_weight_lb"]), step=0.1)
+        ip["clay_weight_per_piece_lb"] = st.number_input("Clay weight per piece lb wet", min_value=0.0, value=float(ip["clay_weight_per_piece_lb"]), step=0.1)
 
-    forms = list(preset_df["Form"]) if not preset_df.empty else []
-    choice = st.selectbox("Choose a form", ["None"] + forms, index=0, key="form_choice")
-
-    if choice != "None" and not preset_df.empty:
-        row = preset_df.loc[preset_df["Form"] == choice].iloc[0]
-        preset_clay_lb = float(row.get("Clay_lb_wet", 0.0))
-        preset_glaze_g = float(row.get("Default_glaze_g", 0.0))
-        note = str(row.get("Notes", "")).strip()
-
-        c1, c2, c3 = st.columns([1, 1, 2])
-        with c1:
-            st.metric("Preset clay", f"{preset_clay_lb:.2f} lb")
-        with c2:
-            st.metric("Preset glaze", f"{preset_glaze_g:.0f} g")
-        with c3:
-            if note:
-                st.caption(note)
-
-    # --- Clay and packaging ---
-    st.subheader("Clay and packaging")
-
-    ip["units_made"] = st.number_input(
-        "Units in this batch", min_value=1, value=int(ip["units_made"]), step=1
-    )
-    ip["clay_price_per_bag"] = st.number_input(
-        "Clay price per bag", min_value=0.0, value=float(ip["clay_price_per_bag"]), step=0.5
-    )
-    ip["clay_bag_weight_lb"] = st.number_input(
-        "Clay bag weight lb", min_value=0.1, value=float(ip["clay_bag_weight_lb"]), step=0.1
-    )
-    ip["clay_weight_per_piece_lb"] = st.number_input(
-        "Clay weight per piece lb wet", min_value=0.0, value=float(ip["clay_weight_per_piece_lb"]), step=0.1
-    )
-
-    ip["clay_yield"] = st.slider(
-        "Clay yield after trimming and loss",
-        min_value=0.5, max_value=1.0,
-        value=float(ip.get("clay_yield", 0.9)), step=0.01,
-        help="Fraction of the starting ball that ends up in the piece after trimming and losses."
-    )
-
-    throw_weight = float(ip.get("clay_weight_per_piece_lb", 0.0))
-    yield_frac = float(ip.get("clay_yield", 1.0))
-    effective_lb = throw_weight / max(yield_frac, 1e-9)
-    waste_pct = (1.0 - yield_frac) * 100.0
-    st.caption(f"You pay for about {effective_lb:.2f} lb of clay per finished piece given {waste_pct:.0f}% loss.")
-
-    ip["packaging_per_piece"] = st.number_input(
-        "Packaging per piece", min_value=0.0, value=float(ip["packaging_per_piece"]), step=0.1
-    )
-
-    # --- Glaze source ---
-    st.subheader("Glaze source")
-    glaze_source = st.radio(
-        "Glaze cost comes from", ["Recipe tab", "Manual table"], index=0, horizontal=True
-    )
-
-    if glaze_source == "Manual table":
-        st.caption("Edit names, cost per lb, and grams per piece.")
-        ss.glaze_piece_df = st.data_editor(
-            ensure_cols(ss.glaze_piece_df, {"Material": "", "Cost_per_lb": 0.0, "Grams_per_piece": 0.0}),
-            column_config={
-                "Material": st.column_config.TextColumn("Material", help="Raw material name"),
-                "Cost_per_lb": st.column_config.NumberColumn("Cost per lb", min_value=0.0, step=0.01),
-                "Grams_per_piece": st.column_config.NumberColumn("Grams per piece", min_value=0.0, step=0.1),
-            },
-            num_rows="dynamic",
-            use_container_width=True,
-            key="glaze_piece_editor_front",
+        ip["clay_yield"] = st.slider(
+            "Clay yield after trimming and loss",
+            min_value=0.5, max_value=1.0,
+            value=float(ip.get("clay_yield", 0.9)), step=0.01,
+            help="Fraction of the starting ball that ends up in the piece after trimming and losses. 1.00 means no loss. 0.85 means 15 percent loss."
         )
-        glaze_pp_cost, source_df = glaze_cost_from_piece_table(ss.glaze_piece_df)
-    else:
-        grams_pp = float(ss.get("recipe_grams_per_piece", 8.0))
-        source_df, glaze_pp_cost = glaze_per_piece_from_recipe(ss.catalog_df, ss.recipe_df, grams_pp)
 
-    st.subheader("Glaze per piece and cost")
-    show_df = source_df.copy()
-    if "Cost_per_piece" in show_df.columns:
-        show_df["Cost_per_piece"] = show_df["Cost_per_piece"].map(money)
-    st.dataframe(show_df, use_container_width=True)
+        throw_weight = float(ip.get("clay_weight_per_piece_lb", 0.0))
+        yield_frac = float(ip.get("clay_yield", 1.0))
+        effective_lb = throw_weight / max(yield_frac, 1e-9)
+        waste_pct = (1.0 - yield_frac) * 100.0
+        st.caption(f"You pay for about {effective_lb:.2f} lb of clay per finished piece given {waste_pct:.0f}% loss.")
 
-    # right column
-    with right:
-        st.subheader("Per piece totals")
-        totals = calc_totals(ip, glaze_pp_cost, 0.0)
-        c = st.columns(3)
-        c[0].metric("Energy", money(totals["energy_pp"]))
-        c[1].metric("Labor", money(totals["labor_pp"]))
-        c[2].metric("Overhead", money(totals["oh_pp"]))
-        st.metric("Total cost per piece", money(totals["total_pp"]))
+        ip["packaging_per_piece"] = st.number_input("Packaging per piece", min_value=0.0, value=float(ip["packaging_per_piece"]), step=0.1)
 
+        st.subheader("Glaze source")
+        glaze_source = st.radio("Glaze cost comes from", ["Recipe tab", "Manual table"], index=0, horizontal=True)
+
+        if glaze_source == "Manual table":
+            st.caption("Edit names, cost per lb, and grams per piece.")
+            ss.glaze_piece_df = st.data_editor(
+                ensure_cols(ss.glaze_piece_df, {"Material": "", "Cost_per_lb": 0.0, "Grams_per_piece": 0.0}),
+                column_config={
+                    "Material": st.column_config.TextColumn("Material", help="Raw material name"),
+                    "Cost_per_lb": st.column_config.NumberColumn("Cost per lb", min_value=0.0, step=0.01),
+                    "Grams_per_piece": st.column_config.NumberColumn("Grams per piece", min_value=0.0, step=0.1),
+                },
+                num_rows="dynamic",
+                use_container_width=True,
+                key="glaze_piece_editor_front",
+            )
+            glaze_pp_cost, source_df = glaze_cost_from_piece_table(ss.glaze_piece_df)
+        else:
+            grams_pp = float(ss.get("recipe_grams_per_piece", 8.0))
+            source_df, glaze_pp_cost = glaze_per_piece_from_recipe(ss.catalog_df, ss.recipe_df, grams_pp)
+
+        st.subheader("Glaze per piece and cost")
+        show_df = source_df.copy()
+        if "Cost_per_piece" in show_df.columns:
+            show_df["Cost_per_piece"] = show_df["Cost_per_piece"].map(money)
+        st.dataframe(show_df, use_container_width=True)
 
         # ---- Other project materials (single table) ----
         st.subheader("Other project materials")
@@ -460,25 +308,19 @@ with left:
         st.caption(f"Project total {money(project_total)} • Adds {money(other_pp)} per piece")
 
     # right column
-       # right column
     with right:
         st.subheader("Per piece totals")
-
         totals = calc_totals(ip, glaze_pp_cost, other_pp)
         c = st.columns(3)
-        with c[0]:
-            st.metric("Energy", money(totals["energy_pp"]))
-        with c[1]:
-            st.metric("Labor", money(totals["labor_pp"]))
-        with c[2]:
-            st.metric("Overhead", money(totals["oh_pp"]))
-
+        c[0].metric("Energy", money(totals["energy_pp"]))
+        c[1].metric("Labor", money(totals["labor_pp"]))
+        c[2].metric("Overhead", money(totals["oh_pp"]))
         st.metric("Other project materials", money(totals["other_pp"]))
         st.metric("Total cost per piece", money(totals["total_pp"]))
-        
+
     with st.expander("Shrink rate helper"):
-       # current shrink setting
-        ss.shrink_rate_pct = st.number_input(
+    # current shrink setting
+    ss.shrink_rate_pct = st.number_input(
         "Shrink percent",
         min_value=0.0, max_value=30.0,
         value=float(ss.shrink_rate_pct), step=0.1,
@@ -500,32 +342,41 @@ with left:
             ss.shrink_rate_pct = calc_pct
             rate = ss.shrink_rate_pct / 100.0
             st.success(f"Shrink percent set to {calc_pct:.2f}%")
+
+    st.divider()
+
     # unit choice for the size calculators
     ss.shrink_units = st.radio("Units", ["in", "mm"], index=(0 if ss.shrink_units == "in" else 1), horizontal=True)
+
     # wet -> fired, fired -> wet
     st.markdown("**Size converter**")
     sc1, sc2, sc3 = st.columns([1, 1, 1])
     wet_size = sc1.number_input(f"Wet size ({ss.shrink_units})", min_value=0.0, value=4.00, step=0.01)
     fired_size_target = sc2.number_input(f"Target fired size ({ss.shrink_units})", min_value=0.0, value=3.52, step=0.01)
+
     fired_from_wet = wet_size * (1.0 - rate)
     wet_needed_for_target = fired_size_target / max(1e-9, 1.0 - rate)
+
     sc3.metric("Fired from wet", f"{fired_from_wet:.3f} {ss.shrink_units}")
     st.caption(f"To end at {fired_size_target:.3f} {ss.shrink_units}, throw about {wet_needed_for_target:.3f} {ss.shrink_units} wet.")
+
+    st.divider()
+
     # lid remake helper
     st.markdown("**Lid remake helper**")
     st.caption("Measure the fired rim outside diameter on the pot. Choose a small clearance to keep the fit comfortable.")
     lc1, lc2, lc3 = st.columns([1, 1, 1])
+
     fired_rim_od = lc1.number_input(f"Fired rim outside diameter ({ss.shrink_units})", min_value=0.0, value=3.00, step=0.01)
     clearance = lc2.number_input(f"Extra diameter for clearance ({ss.shrink_units})", min_value=0.0, value=(0.03 if ss.shrink_units == 'in' else 0.8), step=0.01)
     wet_gallery_id_needed = (fired_rim_od + clearance) / max(1e-9, 1.0 - rate)
     lc3.metric("Wet gallery inner diameter to throw", f"{wet_gallery_id_needed:.3f} {ss.shrink_units}")
+
     # reverse check
     st.caption("Reverse check if you already threw a lid:")
     lid_wet_id = st.number_input(f"Wet gallery inner diameter you threw ({ss.shrink_units})", min_value=0.0, value=wet_gallery_id_needed, step=0.01)
     expected_fired_id = lid_wet_id * (1.0 - rate)
     st.write(f"Expected fired gallery inner diameter: **{expected_fired_id:.3f} {ss.shrink_units}**")
-
-
 
 
 # ------------ Glaze recipe ------------
@@ -717,54 +568,24 @@ with tabs[4]:
     st.metric("Overhead", money(totals["oh_pp"]))
     st.metric("Total cost per piece", money(totals["total_pp"]))
 
-# ------------- Save and load -------------
+# ------------ Save and load ------------
 with tabs[5]:
     st.subheader("Save and load settings")
-
-    # Build a state bundle for download
     state = dict(
         inputs=ss.inputs,
-
-        # tables used elsewhere in the app
-        glaze_piece_df=ensure_cols(
-            ss.glaze_piece_df, {"Material": "", "Cost_per_lb": 0.0, "Grams_per_piece": 0.0}
-        ).to_dict(orient="list"),
-
-        catalog_df=ensure_cols(
-            ss.catalog_df, {"Material": "", "Cost_per_lb": 0.0}
-        ).to_dict(orient="list"),
-
-        recipe_df=ensure_cols(
-            ss.recipe_df, {"Material": "", "Percent": 0.0}
-        ).to_dict(orient="list"),
-
-        other_mat_df=ensure_cols(
-            ss.other_mat_df, {"Item": "", "Unit": "", "Cost_per_unit": 0.0, "Quantity_for_project": 0.0}
-        ).to_dict(orient="list"),
-
+        glaze_piece_df=ensure_cols(ss.glaze_piece_df, {"Material": "", "Cost_per_lb": 0.0, "Grams_per_piece": 0.0}).to_dict(orient="list"),
+        catalog_df=ensure_cols(ss.catalog_df, {"Material": "", "Cost_per_lb": 0.0, "Cost_per_kg": 0.0}).to_dict(orient="list"),
+        recipe_df=ensure_cols(ss.recipe_df, {"Material": "", "Percent": 0.0}).to_dict(orient="list"),
         recipe_grams_per_piece=ss.recipe_grams_per_piece,
-
-        # NEW. include form presets in the JSON
-        form_presets_df=ensure_cols(
-            ss.get("form_presets_df", pd.DataFrame()),
-            {"Form": "", "Clay_lb_wet": 0.0, "Default_glaze_g": 0.0, "Notes": ""}
-        ).to_dict(orient="list"),
+        other_mat_df=ensure_cols(ss.other_mat_df, {"Item":"", "Unit":"", "Cost_per_unit":0.0, "Quantity_for_project":0.0}).to_dict(orient="list"),
     )
-
-    st.download_button(
-        "Download settings JSON",
-        to_json_bytes(state),
-        file_name="pottery_pricing_settings.json"
-    )
-
-    # Load settings from JSON
-    up = st.file_uploader("Upload settings JSON", type=["json"], key="settings_json_up")
+    st.download_button("Download settings JSON", to_json_bytes(state), file_name="pottery_pricing_settings.json")
+    up = st.file_uploader("Upload settings JSON", type=["json"])
     if up is not None:
         try:
             data = from_json_bytes(up.read())
             ss.inputs.update(data.get("inputs", {}))
 
-            # helper to rebuild DataFrames safely
             def dict_to_df(d, cols):
                 if not isinstance(d, dict) or not d:
                     return pd.DataFrame(columns=cols)
@@ -774,62 +595,14 @@ with tabs[5]:
                         df[c] = []
                 return df[cols]
 
-            ss.glaze_piece_df = dict_to_df(
-                data.get("glaze_piece_df", {}), ["Material", "Cost_per_lb", "Grams_per_piece"]
-            )
-            ss.catalog_df = dict_to_df(
-                data.get("catalog_df", {}), ["Material", "Cost_per_lb"]
-            )
-            ss.recipe_df = dict_to_df(
-                data.get("recipe_df", {}), ["Material", "Percent"]
-            )
-            ss.other_mat_df = dict_to_df(
-                data.get("other_mat_df", {}), ["Item", "Unit", "Cost_per_unit", "Quantity_for_project"]
-            )
-            ss.form_presets_df = dict_to_df(
-                data.get("form_presets_df", {}), ["Form", "Clay_lb_wet", "Default_glaze_g", "Notes"]
-            )
-
-            ss.recipe_grams_per_piece = float(
-                data.get("recipe_grams_per_piece", ss.recipe_grams_per_piece)
-            )
-
-            st.success("Loaded settings from JSON.")
+            ss.glaze_piece_df = dict_to_df(data.get("glaze_piece_df", {}), ["Material", "Cost_per_lb", "Grams_per_piece"])
+            ss.catalog_df = dict_to_df(data.get("catalog_df", {}), ["Material", "Cost_per_lb", "Cost_per_kg"])
+            ss.recipe_df = dict_to_df(data.get("recipe_df", {}), ["Material", "Percent"])
+            ss.other_mat_df = dict_to_df(data.get("other_mat_df", {}), ["Item","Unit","Cost_per_unit","Quantity_for_project"])
+            ss.recipe_grams_per_piece = float(data.get("recipe_grams_per_piece", ss.recipe_grams_per_piece))
+            st.success("Loaded")
         except Exception as e:
-            st.error(f"Could not load JSON. {e}")
-
-    st.markdown("### Upload form presets (CSV)")
-    st.caption("CSV must have headers. Form, Clay_lb_wet, Default_glaze_g, Notes")
-
-    csv_mode = st.radio(
-        "When uploading",
-        ["Replace current presets", "Append to current presets"],
-        horizontal=True,
-        key="presets_csv_mode"
-    )
-
-    presets_csv = st.file_uploader("Choose CSV file", type=["csv"], key="presets_csv_up")
-    if presets_csv is not None:
-        try:
-            new_df = pd.read_csv(presets_csv)
-            new_df = ensure_cols(
-                new_df, {"Form": "", "Clay_lb_wet": 0.0, "Default_glaze_g": 0.0, "Notes": ""}
-            )
-
-            if csv_mode == "Replace current presets":
-                ss.form_presets_df = new_df
-            else:
-                base = ensure_cols(
-                    ss.get("form_presets_df", pd.DataFrame()),
-                    {"Form": "", "Clay_lb_wet": 0.0, "Default_glaze_g": 0.0, "Notes": ""}
-                )
-                ss.form_presets_df = pd.concat([base, new_df], ignore_index=True)
-
-            st.success(f"Loaded {len(new_df)} presets.")
-            st.dataframe(ss.form_presets_df.head(10), use_container_width=True)
-        except Exception as e:
-            st.error(f"Could not read CSV. {e}")
-
+            st.error(f"Could not load. {e}")
 
 # ------------ Report ------------
 with tabs[6]:
