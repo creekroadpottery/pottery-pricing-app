@@ -405,42 +405,47 @@ with tabs[0]:
 
 st.subheader("Shrink rate helper")
 
-ss.shrink_rate_pct = st.number_input(
+# percent
+shrink_rate_pct = st.number_input(
     "Shrink rate percent",
     min_value=0.0, max_value=25.0,
     value=float(ss.get("shrink_rate_pct", 12.0)),
     step=0.1,
-    key="shrink_rate_pct",
+    key="shrink_rate_pct",      # widget manages session_state
 )
 
-ss.shrink_units = st.selectbox(
+# units
+units = st.selectbox(
     "Units",
     ["in", "cm"],
     index=(0 if ss.get("shrink_units", "in") == "in" else 1),
     key="shrink_units",
 )
 
-ss.shrink_wet_size = st.number_input(
-    f"Wet size ({ss.shrink_units})",
+# wet size (current)
+wet_size = st.number_input(
+    f"Wet size ({units})",
     min_value=0.0,
     value=float(ss.get("shrink_wet_size", 10.0)),
     step=0.01,
     key="shrink_wet_size",
 )
 
-# compute finished and reverse-calc wet size
-finished = ss.shrink_wet_size * (1.0 - ss.shrink_rate_pct / 100.0)
-st.metric("Finished size", f"{finished:.3f} {ss.shrink_units}")
+# computed finished size
+finished = wet_size * (1.0 - shrink_rate_pct / 100.0)
+st.metric("Finished size", f"{finished:.3f} {units}")
 
-ss.shrink_target_size = st.number_input(
-    f"Target finished size ({ss.shrink_units})",
+# reverse: target finished -> needed wet size
+target_size = st.number_input(
+    f"Target finished size ({units})",
     min_value=0.0,
     value=float(ss.get("shrink_target_size", 9.0)),
     step=0.01,
     key="shrink_target_size",
 )
-needed_wet = ss.shrink_target_size / max(1e-9, (1.0 - ss.shrink_rate_pct / 100.0))
-st.caption(f"Wet size needed for that target. {needed_wet:.3f} {ss.shrink_units}")
+needed_wet = target_size / max(1e-9, (1.0 - shrink_rate_pct / 100.0))
+st.caption(f"Wet size needed for that target: {needed_wet:.3f} {units}")
+
 
 if st.button("Reset shrink defaults"):
     for k in ["shrink_rate_pct","shrink_wet_size","shrink_target_size","shrink_units"]:
