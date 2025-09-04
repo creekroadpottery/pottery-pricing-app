@@ -68,13 +68,10 @@ def other_materials_pp(df, pieces_in_project: int):
 
 # ------------ Session defaults ------------
 if "shrink_rate_pct" not in ss:
-    ss.shrink_rate_pct = 12.0          # typical linear shrink percent
-if "shrink_wet_size" not in ss:
-    ss.shrink_wet_size = 10.0          # example wet size (inches or cm)
-if "shrink_target_size" not in ss:
-    ss.shrink_target_size = 9.0        # example finished size
+    ss.shrink_rate_pct = 12.0   # typical stoneware range 10 to 15
 if "shrink_units" not in ss:
-    ss.shrink_units = "in"             # or "cm"
+    ss.shrink_units = "in"
+
 
 if "inputs" not in ss:
     ss.inputs = dict(
@@ -476,6 +473,66 @@ with left:
 
         st.metric("Other project materials", money(totals["other_pp"]))
         st.metric("Total cost per piece", money(totals["total_pp"]))
+        with st.expander("Shrink rate helper"):
+    # current shrink setting
+    ss.shrink_rate_pct = st.number_input(
+        "Shrink percent",
+        min_value=0.0, max_value=30.0,
+        value=float(ss.shrink_rate_pct), step=0.1,
+        help="Overall linear shrink from wet to fired. 12 means 12 percent."
+    )
+    rate = ss.shrink_rate_pct / 100.0
+
+    st.divider()
+
+    # compute from a quick test tile
+    st.markdown("**Compute from test tile**")
+    c1, c2, c3 = st.columns([1, 1, 1])
+    wet_len = c1.number_input("Wet length", min_value=0.0, value=10.0, step=0.1)
+    fired_len = c2.number_input("Fired length", min_value=0.0, value=8.8, step=0.1)
+    if wet_len > 0:
+        calc_pct = max(0.0, (wet_len - fired_len) / wet_len * 100.0)
+        c3.metric("Shrink from test", f"{calc_pct:.2f}%")
+        if st.button("Use this shrink percent"):
+            ss.shrink_rate_pct = calc_pct
+            rate = ss.shrink_rate_pct / 100.0
+            st.success(f"Shrink percent set to {calc_pct:.2f}%")
+
+    st.divider()
+
+    # unit choice for the size calculators
+    ss.shrink_units = st.radio("Units", ["in", "mm"], index=(0 if ss.shrink_units == "in" else 1), horizontal=True)
+
+    # wet -> fired, fired -> wet
+    st.markdown("**Size converter**")
+    sc1, sc2, sc3 = st.columns([1, 1, 1])
+    wet_size = sc1.number_input(f"Wet size ({ss.shrink_units})", min_value=0.0, value=4.00, step=0.01)
+    fired_size_target = sc2.number_input(f"Target fired size ({ss.shrink_units})", min_value=0.0, value=3.52, step=0.01)
+
+    fired_from_wet = wet_size * (1.0 - rate)
+    wet_needed_for_target = fired_size_target / max(1e-9, 1.0 - rate)
+
+    sc3.metric("Fired from wet", f"{fired_from_wet:.3f} {ss.shrink_units}")
+    st.caption(f"To end at {fired_size_target:.3f} {ss.shrink_units}, throw about {wet_needed_for_target:.3f} {ss.shrink_units} wet.")
+
+    st.divider()
+
+    # lid remake helper
+    st.markdown("**Lid remake helper**")
+    st.caption("Measure the fired rim outside diameter on the pot. Choose a small clearance to keep the fit comfortable.")
+    lc1, lc2, lc3 = st.columns([1, 1, 1])
+
+    fired_rim_od = lc1.number_input(f"Fired rim outside diameter ({ss.shrink_units})", min_value=0.0, value=3.00, step=0.01)
+    clearance = lc2.number_input(f"Extra diameter for clearance ({ss.shrink_units})", min_value=0.0, value=(0.03 if ss.shrink_units == 'in' else 0.8), step=0.01)
+    wet_gallery_id_needed = (fired_rim_od + clearance) / max(1e-9, 1.0 - rate)
+    lc3.metric("Wet gallery inner diameter to throw", f"{wet_gallery_id_needed:.3f} {ss.shrink_units}")
+
+    # reverse check
+    st.caption("Reverse check if you already threw a lid:")
+    lid_wet_id = st.number_input(f"Wet gallery inner diameter you threw ({ss.shrink_units})", min_value=0.0, value=wet_gallery_id_needed, step=0.01)
+    expected_fired_id = lid_wet_id * (1.0 - rate)
+    st.write(f"Expected fired gallery inner diameter: **{expected_fired_id:.3f} {ss.shrink_units}**")
+
 
 
 
