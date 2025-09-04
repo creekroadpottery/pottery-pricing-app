@@ -416,66 +416,7 @@ with left:
         show_df["Cost_per_piece"] = show_df["Cost_per_piece"].map(money)
     st.dataframe(show_df, use_container_width=True)
 
-    # right column
-    with right:
-        st.subheader("Per piece totals")
-        totals = calc_totals(ip, glaze_pp_cost, 0.0)
-        c = st.columns(3)
-        c[0].metric("Energy", money(totals["energy_pp"]))
-        c[1].metric("Labor", money(totals["labor_pp"]))
-        c[2].metric("Overhead", money(totals["oh_pp"]))
-        st.metric("Total cost per piece", money(totals["total_pp"]))
-
-
-        # ---- Other project materials (single table) ----
-        st.subheader("Other project materials")
-        st.caption("Add one-time items for this batch. The cost is divided by the number of pieces in this batch.")
-
-        pieces = max(1, int(ip["units_made"]))
-        base = ensure_cols(
-            ss.other_mat_df,
-            {"Item":"", "Unit":"", "Cost_per_unit":0.0, "Quantity_for_project":0.0}
-        ).copy()
-        base["Line_total"] = base["Cost_per_unit"] * base["Quantity_for_project"]
-        base["Cost_per_piece"] = base["Line_total"] / pieces
-
-        ss.other_mat_df = st.data_editor(
-            base,
-            column_config={
-                "Item": st.column_config.TextColumn("Item"),
-                "Unit": st.column_config.TextColumn("Unit"),
-                "Cost_per_unit": st.column_config.NumberColumn("Cost per unit", min_value=0.0, step=0.01),
-                "Quantity_for_project": st.column_config.NumberColumn("Quantity for project", min_value=0.0, step=0.1),
-                "Line_total": st.column_config.NumberColumn("Line total", disabled=True),
-                "Cost_per_piece": st.column_config.NumberColumn("Cost per piece", disabled=True),
-            },
-            num_rows="dynamic",
-            use_container_width=True,
-            key="other_materials_editor_main",
-        )
-
-        project_total = float(ss.other_mat_df["Line_total"].sum()) if "Line_total" in ss.other_mat_df else 0.0
-        other_pp = project_total / pieces
-        st.caption(f"Project total {money(project_total)} • Adds {money(other_pp)} per piece")
-
-    # right column
-       # right column
-    with right:
-        st.subheader("Per piece totals")
-
-        totals = calc_totals(ip, glaze_pp_cost, other_pp)
-        c = st.columns(3)
-        with c[0]:
-            st.metric("Energy", money(totals["energy_pp"]))
-        with c[1]:
-            st.metric("Labor", money(totals["labor_pp"]))
-        with c[2]:
-            st.metric("Overhead", money(totals["oh_pp"]))
-
-        st.metric("Other project materials", money(totals["other_pp"]))
-        st.metric("Total cost per piece", money(totals["total_pp"]))
-        
- # --- Shrink rate tools: everything in one dropdown ---
+    # --- Shrink rate tools: everything in one dropdown ---
 with st.expander("Shrink rate helper", expanded=False):
 
     # Compute shrink from a test tile
@@ -574,10 +515,67 @@ with st.expander("Shrink rate helper", expanded=False):
     )
     expected_fired_id = lid_wet_id * (1.0 - rate)
     st.write(f"Expected fired gallery inner diameter: **{expected_fired_id:.3f} {u}**")
-   
+
+    # right column
+    with right:
+        st.subheader("Per piece totals")
+        totals = calc_totals(ip, glaze_pp_cost, 0.0)
+        c = st.columns(3)
+        c[0].metric("Energy", money(totals["energy_pp"]))
+        c[1].metric("Labor", money(totals["labor_pp"]))
+        c[2].metric("Overhead", money(totals["oh_pp"]))
+        st.metric("Total cost per piece", money(totals["total_pp"]))
 
 
+        # ---- Other project materials (single table) ----
+        st.subheader("Other project materials")
+        st.caption("Add one-time items for this batch. The cost is divided by the number of pieces in this batch.")
 
+        pieces = max(1, int(ip["units_made"]))
+        base = ensure_cols(
+            ss.other_mat_df,
+            {"Item":"", "Unit":"", "Cost_per_unit":0.0, "Quantity_for_project":0.0}
+        ).copy()
+        base["Line_total"] = base["Cost_per_unit"] * base["Quantity_for_project"]
+        base["Cost_per_piece"] = base["Line_total"] / pieces
+
+        ss.other_mat_df = st.data_editor(
+            base,
+            column_config={
+                "Item": st.column_config.TextColumn("Item"),
+                "Unit": st.column_config.TextColumn("Unit"),
+                "Cost_per_unit": st.column_config.NumberColumn("Cost per unit", min_value=0.0, step=0.01),
+                "Quantity_for_project": st.column_config.NumberColumn("Quantity for project", min_value=0.0, step=0.1),
+                "Line_total": st.column_config.NumberColumn("Line total", disabled=True),
+                "Cost_per_piece": st.column_config.NumberColumn("Cost per piece", disabled=True),
+            },
+            num_rows="dynamic",
+            use_container_width=True,
+            key="other_materials_editor_main",
+        )
+
+        project_total = float(ss.other_mat_df["Line_total"].sum()) if "Line_total" in ss.other_mat_df else 0.0
+        other_pp = project_total / pieces
+        st.caption(f"Project total {money(project_total)} • Adds {money(other_pp)} per piece")
+
+    # right column
+       # right column
+    with right:
+        st.subheader("Per piece totals")
+
+        totals = calc_totals(ip, glaze_pp_cost, other_pp)
+        c = st.columns(3)
+        with c[0]:
+            st.metric("Energy", money(totals["energy_pp"]))
+        with c[1]:
+            st.metric("Labor", money(totals["labor_pp"]))
+        with c[2]:
+            st.metric("Overhead", money(totals["oh_pp"]))
+
+        st.metric("Other project materials", money(totals["other_pp"]))
+        st.metric("Total cost per piece", money(totals["total_pp"]))
+        
+    
 
 # ------------ Glaze recipe ------------
 with tabs[1]:
