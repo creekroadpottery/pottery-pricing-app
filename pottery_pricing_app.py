@@ -328,8 +328,8 @@ with tabs[0]:
     left, right = st.columns(2)
 
     # left column
-    with left:
-# --- Form preset picker (with options) ---
+with left:
+  # --- Form preset picker (with options) ---
     st.subheader("Form preset")
 
     preset_df = ensure_cols(
