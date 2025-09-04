@@ -628,56 +628,54 @@ with tabs[4]:
     st.metric("Overhead", money(totals["oh_pp"]))
     st.metric("Total cost per piece", money(totals["total_pp"]))
 
-# ------------ Save and load ------------
+# ------------- Save and load -------------
 with tabs[5]:
     st.subheader("Save and load settings")
+
+    # Build a state bundle for download
     state = dict(
         inputs=ss.inputs,
-        glaze_piece_df=ensure_cols(ss.glaze_piece_df, {"Material": "", "Cost_per_lb": 0.0, "Grams_per_piece": 0.0}).to_dict(orient="list"),
-        catalog_df=ensure_cols(ss.catalog_df, {"Material": "", "Cost_per_lb": 0.0, "Cost_per_kg": 0.0}).to_dict(orient="list"),
-        recipe_df=ensure_cols(ss.recipe_df, {"Material": "", "Percent": 0.0}).to_dict(orient="list"),
-        recipe_grams_per_piece=ss.recipe_grams_per_piece,
-        other_mat_df=ensure_cols(ss.other_mat_df, {"Item":"", "Unit":"", "Cost_per_unit":0.0, "Quantity_for_project":0.0}).to_dict(orient="list"),
-        form_presets_df = ensure_cols(
-    ss.form_presets_df,
-    {"Form":"", "Clay_lb_wet":0.0, "Default_glaze_g":0.0, "Notes":""}
-).to_dict(orient="list"),
 
+        # tables used elsewhere in the app
+        glaze_piece_df=ensure_cols(
+            ss.glaze_piece_df, {"Material": "", "Cost_per_lb": 0.0, "Grams_per_piece": 0.0}
+        ).to_dict(orient="list"),
+
+        catalog_df=ensure_cols(
+            ss.catalog_df, {"Material": "", "Cost_per_lb": 0.0}
+        ).to_dict(orient="list"),
+
+        recipe_df=ensure_cols(
+            ss.recipe_df, {"Material": "", "Percent": 0.0}
+        ).to_dict(orient="list"),
+
+        other_mat_df=ensure_cols(
+            ss.other_mat_df, {"Item": "", "Unit": "", "Cost_per_unit": 0.0, "Quantity_for_project": 0.0}
+        ).to_dict(orient="list"),
+
+        recipe_grams_per_piece=ss.recipe_grams_per_piece,
+
+        # NEW. include form presets in the JSON
+        form_presets_df=ensure_cols(
+            ss.get("form_presets_df", pd.DataFrame()),
+            {"Form": "", "Clay_lb_wet": 0.0, "Default_glaze_g": 0.0, "Notes": ""}
+        ).to_dict(orient="list"),
     )
-    st.download_button("Download settings JSON", to_json_bytes(state), file_name="pottery_pricing_settings.json")
-    up = st.file_uploader("Upload settings JSON", type=["json"])
+
+    st.download_button(
+        "Download settings JSON",
+        to_json_bytes(state),
+        file_name="pottery_pricing_settings.json"
+    )
+
+    # Load settings from JSON
+    up = st.file_uploader("Upload settings JSON", type=["json"], key="settings_json_up")
     if up is not None:
         try:
             data = from_json_bytes(up.read())
             ss.inputs.update(data.get("inputs", {}))
-    st.markdown("### Upload form presets (CSV)")
-    st.caption("CSV must have headers: Form, Clay_lb_wet, Default_glaze_g, Notes")
 
-csv_mode = st.radio(
-    "When uploading",
-    ["Replace current presets", "Append to current presets"],
-    horizontal=True,
-    key="presets_csv_mode"
-)
-
-presets_csv = st.file_uploader("Choose CSV file", type=["csv"], key="presets_csv_up")
-if presets_csv is not None:
-    try:
-        new_df = pd.read_csv(presets_csv)
-        new_df = ensure_cols(new_df, {"Form":"", "Clay_lb_wet":0.0, "Default_glaze_g":0.0, "Notes":""})
-
-        if csv_mode == "Replace current presets":
-            ss.form_presets_df = new_df
-        else:
-            base = ensure_cols(ss.get("form_presets_df", pd.DataFrame()),
-                               {"Form":"", "Clay_lb_wet":0.0, "Default_glaze_g":0.0, "Notes":""})
-            ss.form_presets_df = pd.concat([base, new_df], ignore_index=True)
-
-        st.success(f"Loaded {len(new_df)} presets")
-        st.dataframe(ss.form_presets_df.head(), use_container_width=True)
-    except Exception as e:
-        st.error(f"Could not read CSV. {e}")
-
+            # helper to rebuild DataFrames safely
             def dict_to_df(d, cols):
                 if not isinstance(d, dict) or not d:
                     return pd.DataFrame(columns=cols)
@@ -687,19 +685,62 @@ if presets_csv is not None:
                         df[c] = []
                 return df[cols]
 
-            ss.glaze_piece_df = dict_to_df(data.get("glaze_piece_df", {}), ["Material", "Cost_per_lb", "Grams_per_piece"])
-            ss.catalog_df = dict_to_df(data.get("catalog_df", {}), ["Material", "Cost_per_lb", "Cost_per_kg"])
-            ss.recipe_df = dict_to_df(data.get("recipe_df", {}), ["Material", "Percent"])
-            ss.other_mat_df = dict_to_df(data.get("other_mat_df", {}), ["Item","Unit","Cost_per_unit","Quantity_for_project"])
-            ss.recipe_grams_per_piece = float(data.get("recipe_grams_per_piece", ss.recipe_grams_per_piece))
-            st.success("Loaded")
+            ss.glaze_piece_df = dict_to_df(
+                data.get("glaze_piece_df", {}), ["Material", "Cost_per_lb", "Grams_per_piece"]
+            )
+            ss.catalog_df = dict_to_df(
+                data.get("catalog_df", {}), ["Material", "Cost_per_lb"]
+            )
+            ss.recipe_df = dict_to_df(
+                data.get("recipe_df", {}), ["Material", "Percent"]
+            )
+            ss.other_mat_df = dict_to_df(
+                data.get("other_mat_df", {}), ["Item", "Unit", "Cost_per_unit", "Quantity_for_project"]
+            )
             ss.form_presets_df = dict_to_df(
-    data.get("form_presets_df", {}),
-    ["Form","Clay_lb_wet","Default_glaze_g","Notes"]
-)
+                data.get("form_presets_df", {}), ["Form", "Clay_lb_wet", "Default_glaze_g", "Notes"]
+            )
 
+            ss.recipe_grams_per_piece = float(
+                data.get("recipe_grams_per_piece", ss.recipe_grams_per_piece)
+            )
+
+            st.success("Loaded settings from JSON.")
         except Exception as e:
-            st.error(f"Could not load. {e}")
+            st.error(f"Could not load JSON. {e}")
+
+    st.markdown("### Upload form presets (CSV)")
+    st.caption("CSV must have headers. Form, Clay_lb_wet, Default_glaze_g, Notes")
+
+    csv_mode = st.radio(
+        "When uploading",
+        ["Replace current presets", "Append to current presets"],
+        horizontal=True,
+        key="presets_csv_mode"
+    )
+
+    presets_csv = st.file_uploader("Choose CSV file", type=["csv"], key="presets_csv_up")
+    if presets_csv is not None:
+        try:
+            new_df = pd.read_csv(presets_csv)
+            new_df = ensure_cols(
+                new_df, {"Form": "", "Clay_lb_wet": 0.0, "Default_glaze_g": 0.0, "Notes": ""}
+            )
+
+            if csv_mode == "Replace current presets":
+                ss.form_presets_df = new_df
+            else:
+                base = ensure_cols(
+                    ss.get("form_presets_df", pd.DataFrame()),
+                    {"Form": "", "Clay_lb_wet": 0.0, "Default_glaze_g": 0.0, "Notes": ""}
+                )
+                ss.form_presets_df = pd.concat([base, new_df], ignore_index=True)
+
+            st.success(f"Loaded {len(new_df)} presets.")
+            st.dataframe(ss.form_presets_df.head(10), use_container_width=True)
+        except Exception as e:
+            st.error(f"Could not read CSV. {e}")
+
 
 # ------------ Report ------------
 with tabs[6]:
