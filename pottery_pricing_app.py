@@ -92,26 +92,30 @@ if "glaze_piece_df" not in ss:
         {"Material":"Frit 3134","Cost_per_lb":0.00,"Grams_per_piece":0.0},
     ])
 
-# Form presets table in session (empty by default)
+# --- Form presets at startup ---
+from pathlib import Path
+
 if "form_presets_df" not in ss:
-    ss.form_presets_df = pd.DataFrame(
-        [{"Form":"Mug", "Clay_lb_wet":0.90, "Default_glaze_g":40, "Notes":"12 oz straight"},
-         {"Form":"Bowl (cereal)", "Clay_lb_wet":1.25, "Default_glaze_g":55, "Notes":"~6 in"},
-         {"Form":"Plate (10 in)", "Clay_lb_wet":2.50, "Default_glaze_g":110, "Notes":"dinner"}]
-    )
-    # If you prefer to start empty, use:
-    # ss.form_presets_df = pd.DataFrame(columns=["Form","Clay_lb_wet","Default_glaze_g","Notes"])
+    try:
+        # adjust the path if you put the file in a folder like data/form_presets.csv
+        presets_path = Path("form_presets.csv")
+        df = pd.read_csv(presets_path)
 
-# other materials default
-if "other_mat_df" not in ss:
-    ss.other_mat_df = pd.DataFrame([
-        {"Item":"Hand pump","Unit":"each","Cost_per_unit":0.85,"Quantity_for_project":16.0},
-    ])
+        # make sure columns exist and in the right order
+        ss.form_presets_df = ensure_cols(
+            df, {"Form":"", "Clay_lb_wet":0.0, "Default_glaze_g":0.0, "Notes":""}
+        )
+    except Exception as e:
+        # fallback if the CSV is missing or malformed
+        ss.form_presets_df = pd.DataFrame(
+            [
+                {"Form":"Mug", "Clay_lb_wet":0.90, "Default_glaze_g":40, "Notes":"12 oz straight"},
+                {"Form":"Bowl cereal", "Clay_lb_wet":1.25, "Default_glaze_g":55, "Notes":"about 6 in"},
+                {"Form":"Plate 10 in", "Clay_lb_wet":2.50, "Default_glaze_g":110, "Notes":"dinner"}
+            ],
+            columns=["Form","Clay_lb_wet","Default_glaze_g","Notes"]
+        )
 
-if "shrink_rate_pct" not in ss:
-    ss.shrink_rate_pct = 12.0   # typical stoneware range 10 to 15
-if "shrink_units" not in ss:
-    ss.shrink_units = "in"
     
 
 
