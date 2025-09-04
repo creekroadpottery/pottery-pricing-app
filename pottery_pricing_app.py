@@ -650,8 +650,8 @@ with tabs[5]:
         try:
             data = from_json_bytes(up.read())
             ss.inputs.update(data.get("inputs", {}))
-st.markdown("### Upload form presets (CSV)")
-st.caption("CSV must have headers: Form, Clay_lb_wet, Default_glaze_g, Notes")
+    st.markdown("### Upload form presets (CSV)")
+    st.caption("CSV must have headers: Form, Clay_lb_wet, Default_glaze_g, Notes")
 
 csv_mode = st.radio(
     "When uploading",
