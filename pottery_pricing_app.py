@@ -94,27 +94,30 @@ if "glaze_piece_df" not in ss:
 
 # --- Form presets at startup ---
 from pathlib import Path
+import pandas as pd
 
 if "form_presets_df" not in ss:
     try:
-        # adjust the path if you put the file in a folder like data/form_presets.csv
-        presets_path = Path("https://github.com/creekroadpottery/pottery-pricing-app/blob/main/form_presets.csv")
-        df = pd.read_csv(form_presets.csv)
+        # use the RAW GitHub URL
+        presets_url = "https://raw.githubusercontent.com/creekroadpottery/pottery-pricing-app/main/form_presets.csv"
+        df = pd.read_csv(presets_url)
 
         # make sure columns exist and in the right order
         ss.form_presets_df = ensure_cols(
-            df, {"Form":"", "Clay_lb_wet":0.0, "Default_glaze_g":0.0, "Notes":""}
+            df, {"Form": "", "Clay_lb_wet": 0.0, "Default_glaze_g": 0.0, "Notes": ""}
         )
+
     except Exception as e:
         # fallback if the CSV is missing or malformed
         ss.form_presets_df = pd.DataFrame(
             [
-                {"Form":"Mug", "Clay_lb_wet":0.90, "Default_glaze_g":40, "Notes":"12 oz straight"},
-                {"Form":"Bowl cereal", "Clay_lb_wet":1.25, "Default_glaze_g":55, "Notes":"about 6 in"},
-                {"Form":"Plate 10 in", "Clay_lb_wet":2.50, "Default_glaze_g":110, "Notes":"dinner"}
+                {"Form": "Mug", "Clay_lb_wet": 0.90, "Default_glaze_g": 40, "Notes": "12 oz straight"},
+                {"Form": "Bowl cereal", "Clay_lb_wet": 1.25, "Default_glaze_g": 55, "Notes": "about 6 in"},
+                {"Form": "Plate 10 in", "Clay_lb_wet": 2.50, "Default_glaze_g": 110, "Notes": "dinner"}
             ],
-            columns=["Form","Clay_lb_wet","Default_glaze_g","Notes"]
+            columns=["Form", "Clay_lb_wet", "Default_glaze_g", "Notes"]
         )
+
 
     
 
