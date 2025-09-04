@@ -54,6 +54,15 @@ def other_materials_pp(df, pieces_in_project: int):
     return per_piece, project_total, df2
 
 # ------------ Session defaults ------------
+if "shrink_rate_pct" not in ss:
+    ss.shrink_rate_pct = 12.0          # typical linear shrink percent
+if "shrink_wet_size" not in ss:
+    ss.shrink_wet_size = 10.0          # example wet size (inches or cm)
+if "shrink_target_size" not in ss:
+    ss.shrink_target_size = 9.0        # example finished size
+if "shrink_units" not in ss:
+    ss.shrink_units = "in"             # or "cm"
+
 if "inputs" not in ss:
     ss.inputs = dict(
         units_made=1,
@@ -394,47 +403,49 @@ with tabs[0]:
         st.metric("Total cost per piece", money(totals["total_pp"]))
 
 
-with st.expander("Shrink rate helper"):
-    # current shrink setting
-    ss.shrink_rate_pct = st.number_input(
-        "Shrink percent",
-        min_value=0.0, max_value=30.0,
-        value=float(ss.shrink_rate_pct), step=0.1,
-        help="Overall linear shrink from wet to fired. 12 means 12 percent."
-    )
-    rate = ss.shrink_rate_pct / 100.0
+st.subheader("Shrink rate helper")
 
-    st.divider()
+ss.shrink_rate_pct = st.number_input(
+    "Shrink rate percent",
+    min_value=0.0, max_value=25.0,
+    value=float(ss.get("shrink_rate_pct", 12.0)),
+    step=0.1,
+    key="shrink_rate_pct",
+)
 
-    # compute from a quick test tile
-    st.markdown("**Compute from test tile**")
-    c1, c2, c3 = st.columns([1, 1, 1])
-    wet_len = c1.number_input("Wet length", min_value=0.0, value=10.0, step=0.1)
-    fired_len = c2.number_input("Fired length", min_value=0.0, value=8.8, step=0.1)
-    if wet_len > 0:
-        calc_pct = max(0.0, (wet_len - fired_len) / wet_len * 100.0)
-        c3.metric("Shrink from test", f"{calc_pct:.2f}%")
-        if st.button("Use this shrink percent"):
-            ss.shrink_rate_pct = calc_pct
-            rate = ss.shrink_rate_pct / 100.0
-            st.success(f"Shrink percent set to {calc_pct:.2f}%")
+ss.shrink_units = st.selectbox(
+    "Units",
+    ["in", "cm"],
+    index=(0 if ss.get("shrink_units", "in") == "in" else 1),
+    key="shrink_units",
+)
 
-    st.divider()
+ss.shrink_wet_size = st.number_input(
+    f"Wet size ({ss.shrink_units})",
+    min_value=0.0,
+    value=float(ss.get("shrink_wet_size", 10.0)),
+    step=0.01,
+    key="shrink_wet_size",
+)
 
-    # unit choice for the size calculators
-    ss.shrink_units = st.radio("Units", ["in", "mm"], index=(0 if ss.shrink_units == "in" else 1), horizontal=True)
+# compute finished and reverse-calc wet size
+finished = ss.shrink_wet_size * (1.0 - ss.shrink_rate_pct / 100.0)
+st.metric("Finished size", f"{finished:.3f} {ss.shrink_units}")
 
-    # wet -> fired, fired -> wet
-    st.markdown("**Size converter**")
-    sc1, sc2, sc3 = st.columns([1, 1, 1])
-    wet_size = sc1.number_input(f"Wet size ({ss.shrink_units})", min_value=0.0, value=4.00, step=0.01)
-    fired_size_target = sc2.number_input(f"Target fired size ({ss.shrink_units})", min_value=0.0, value=3.52, step=0.01)
+ss.shrink_target_size = st.number_input(
+    f"Target finished size ({ss.shrink_units})",
+    min_value=0.0,
+    value=float(ss.get("shrink_target_size", 9.0)),
+    step=0.01,
+    key="shrink_target_size",
+)
+needed_wet = ss.shrink_target_size / max(1e-9, (1.0 - ss.shrink_rate_pct / 100.0))
+st.caption(f"Wet size needed for that target. {needed_wet:.3f} {ss.shrink_units}")
 
-    fired_from_wet = wet_size * (1.0 - rate)
-    wet_needed_for_target = fired_size_target / max(1e-9, 1.0 - rate)
-
-    sc3.metric("Fired from wet", f"{fired_from_wet:.3f} {ss.shrink_units}")
-    st.caption(f"To end at {fired_size_target:.3f} {ss.shrink_units}, throw about {wet_needed_for_target:.3f} {ss.shrink_units} wet.")
+if st.button("Reset shrink defaults"):
+    for k in ["shrink_rate_pct","shrink_wet_size","shrink_target_size","shrink_units"]:
+        ss.pop(k, None)
+    st.rerun()
 
     st.divider()
 
