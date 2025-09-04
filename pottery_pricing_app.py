@@ -123,31 +123,27 @@ if "glaze_piece_df" not in ss:
         {"Material":"Frit 3134","Cost_per_lb":0.00,"Grams_per_piece":0.0},
     ])
 
-# --- Form presets at startup ---
-from pathlib import Path
-import pandas as pd
-
-if "form_presets_df" not in ss:
+# --- Form presets loader (cached) ---
+@st.cache_data(show_spinner=False)
+def load_form_presets():
+    url = "https://raw.githubusercontent.com/creekroadpottery/pottery-pricing-app/main/form_presets.csv"
     try:
-        # use the RAW GitHub URL
-        presets_url = "https://raw.githubusercontent.com/creekroadpottery/pottery-pricing-app/main/form_presets.csv"
-        df = pd.read_csv(presets_url)
-
-        # make sure columns exist and in the right order
-        ss.form_presets_df = ensure_cols(
-            df, {"Form": "", "Clay_lb_wet": 0.0, "Default_glaze_g": 0.0, "Notes": ""}
-        )
-
-    except Exception as e:
-        # fallback if the CSV is missing or malformed
-        ss.form_presets_df = pd.DataFrame(
+        df = pd.read_csv(url)
+        return ensure_cols(df, {"Form": "", "Clay_lb_wet": 0.0, "Default_glaze_g": 0.0, "Notes": ""})
+    except Exception:
+        # fallback if CSV is missing or network issue
+        return pd.DataFrame(
             [
-                {"Form": "Mug", "Clay_lb_wet": 0.90, "Default_glaze_g": 40, "Notes": "12 oz straight"},
-                {"Form": "Bowl cereal", "Clay_lb_wet": 1.25, "Default_glaze_g": 55, "Notes": "about 6 in"},
-                {"Form": "Plate 10 in", "Clay_lb_wet": 2.50, "Default_glaze_g": 110, "Notes": "dinner"}
+                {"Form": "Mug",         "Clay_lb_wet": 0.90, "Default_glaze_g": 40,  "Notes": "12 oz straight"},
+                {"Form": "Bowl cereal", "Clay_lb_wet": 1.25, "Default_glaze_g": 55,  "Notes": "about 6 in"},
+                {"Form": "Plate 10 in", "Clay_lb_wet": 2.50, "Default_glaze_g": 110, "Notes": "dinner"},
             ],
             columns=["Form", "Clay_lb_wet", "Default_glaze_g", "Notes"]
         )
+
+if "form_presets_df" not in ss:
+    ss.form_presets_df = load_form_presets()
+
 
 
     
@@ -415,73 +411,65 @@ with tabs[0]:
         st.metric("Other project materials", money(totals["other_pp"]))
         st.metric("Total cost per piece", money(totals["total_pp"]))
 
+# inside: with tabs[0]:  ...  with left:  ...
+shrink_widget()   # <- adds the dropdown + calculators here only
 
-st.subheader("Shrink rate helper")
+def shrink_widget():
+    # defaults
+    ss.setdefault("shrink_rate_pct", 12.0)
+    ss.setdefault("shrink_units", "in")
+    ss.setdefault("shrink_wet_size", 10.0)
+    ss.setdefault("shrink_target_size", 9.0)
 
-# percent
-shrink_rate_pct = st.number_input(
-    "Shrink rate percent",
-    min_value=0.0, max_value=25.0,
-    value=float(ss.get("shrink_rate_pct", 12.0)),
-    step=0.1,
-    key="shrink_rate_pct",      # widget manages session_state
-)
+    st.subheader("Shrink rate")
+    # quick presets
+    preset = st.selectbox(
+        "Choose a shrink rate",
+        ["8", "10", "12", "14", "16", "18", "Custom"],
+        index=["8","10","12","14","16","18","Custom"].index(str(int(ss.shrink_rate_pct)) if ss.shrink_rate_pct in [8,10,12,14,16,18] else "Custom"),
+        help="Pick a common rate or select Custom."
+    )
+    if preset != "Custom":
+        ss.shrink_rate_pct = float(preset)
+    else:
+        ss.shrink_rate_pct = st.number_input("Custom shrink rate percent", 0.0, 25.0, float(ss.shrink_rate_pct), 0.1)
 
-# units
-units = st.selectbox(
-    "Units",
-    ["in", "cm"],
-    index=(0 if ss.get("shrink_units", "in") == "in" else 1),
-    key="shrink_units",
-)
+    # small status line
+    st.caption(f"Using shrink rate {ss.shrink_rate_pct:.1f} percent")
 
-# wet size (current)
-wet_size = st.number_input(
-    f"Wet size ({units})",
-    min_value=0.0,
-    value=float(ss.get("shrink_wet_size", 10.0)),
-    step=0.01,
-    key="shrink_wet_size",
-)
+    with st.expander("Shrink calculators"):
+        cols = st.columns([1,1,1])
+        with cols[0]:
+            ss.shrink_units = st.selectbox("Units", ["in", "cm"], index=0 if ss.shrink_units=="in" else 1)
 
-# computed finished size
-finished = wet_size * (1.0 - shrink_rate_pct / 100.0)
-st.metric("Finished size", f"{finished:.3f} {units}")
+        # forward: wet -> finished
+        with cols[1]:
+            ss.shrink_wet_size = st.number_input(
+                f"Wet size ({ss.shrink_units})", min_value=0.0, value=float(ss.shrink_wet_size), step=0.01
+            )
+        finished = ss.shrink_wet_size * (1.0 - ss.shrink_rate_pct/100.0)
 
-# reverse: target finished -> needed wet size
-target_size = st.number_input(
-    f"Target finished size ({units})",
-    min_value=0.0,
-    value=float(ss.get("shrink_target_size", 9.0)),
-    step=0.01,
-    key="shrink_target_size",
-)
-needed_wet = target_size / max(1e-9, (1.0 - shrink_rate_pct / 100.0))
-st.caption(f"Wet size needed for that target: {needed_wet:.3f} {units}")
+        # reverse: finished target -> wet
+        with cols[2]:
+            ss.shrink_target_size = st.number_input(
+                f"Target finished size ({ss.shrink_units})", min_value=0.0, value=float(ss.shrink_target_size), step=0.01
+            )
+        needed_wet = ss.shrink_target_size / max(1e-9, 1.0 - ss.shrink_rate_pct/100.0)
 
+        m1, m2 = st.columns(2)
+        m1.metric("Finished size", f"{finished:.3f} {ss.shrink_units}")
+        m2.metric("Wet needed for target", f"{needed_wet:.3f} {ss.shrink_units}")
 
-if st.button("Reset shrink defaults"):
-    for k in ["shrink_rate_pct","shrink_wet_size","shrink_target_size","shrink_units"]:
-        ss.pop(k, None)
-    st.rerun()
+        # optional lid helper
+        st.caption("Lid remake helper")
+        lc1, lc2, lc3 = st.columns([1,1,1])
+        rate = ss.shrink_rate_pct/100.0
+        fired_rim_od = lc1.number_input(f"Fired rim outside diameter ({ss.shrink_units})", min_value=0.0, value=3.00, step=0.01)
+        default_clearance = 0.03 if ss.shrink_units == "in" else 0.8
+        clearance = lc2.number_input(f"Extra diameter for clearance ({ss.shrink_units})", min_value=0.0, value=default_clearance, step=0.01)
+        wet_gallery_id_needed = (fired_rim_od + clearance) / max(1e-9, 1.0 - rate)
+        lc3.metric("Wet gallery inner diameter", f"{wet_gallery_id_needed:.3f} {ss.shrink_units}")
 
-    st.divider()
-
-    # lid remake helper
-    st.markdown("**Lid remake helper**")
-    st.caption("Measure the fired rim outside diameter on the pot. Choose a small clearance to keep the fit comfortable.")
-    lc1, lc2, lc3 = st.columns([1, 1, 1])
-
-    fired_rim_od = lc1.number_input(f"Fired rim outside diameter ({ss.shrink_units})", min_value=0.0, value=3.00, step=0.01)
-    clearance = lc2.number_input(f"Extra diameter for clearance ({ss.shrink_units})", min_value=0.0, value=(0.03 if ss.shrink_units == 'in' else 0.8), step=0.01)
-    wet_gallery_id_needed = (fired_rim_od + clearance) / max(1e-9, 1.0 - rate)
-    lc3.metric("Wet gallery inner diameter to throw", f"{wet_gallery_id_needed:.3f} {ss.shrink_units}")
-
-    # reverse check
-    st.caption("Reverse check if you already threw a lid:")
-    lid_wet_id = st.number_input(f"Wet gallery inner diameter you threw ({ss.shrink_units})", min_value=0.0, value=wet_gallery_id_needed, step=0.01)
-    expected_fired_id = lid_wet_id * (1.0 - rate)
-    st.write(f"Expected fired gallery inner diameter: **{expected_fired_id:.3f} {ss.shrink_units}**")
 
 
 # ------------ Glaze recipe ------------
