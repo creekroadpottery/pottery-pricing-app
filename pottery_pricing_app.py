@@ -387,7 +387,7 @@ with tabs[0]:
     shrink_widget()   # <- adds the dropdown + calculators here only
 
         
-    # --- Glaze source ---
+        # --- Glaze source ---
         st.subheader("Glaze source")
         glaze_source = st.radio("Glaze cost comes from", ["Recipe tab", "Manual table"], index=0, horizontal=True)
 
