@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import json
@@ -227,68 +228,6 @@ with tabs[0]:
 
     # left column
     with left:
-         # --- Form preset picker (with options) ---
-st.subheader("Form preset")
-
-# Build choices
-forms = list(ss.form_presets_df["Form"]) if not ss.form_presets_df.empty else []
-choice = st.selectbox("Choose a form", ["None"] + forms, index=0, key="form_choice")
-
-# Preview the preset (do not change inputs yet)
-if choice != "None":
-    row = ss.form_presets_df.loc[ss.form_presets_df["Form"] == choice].iloc[0]
-    preset_clay_lb = float(row.get("Clay_lb_wet", 0.0))
-    preset_glaze_g = float(row.get("Default_glaze_g", 0.0))
-    note = str(row.get("Notes", "")).strip()
-
-    # Show a little preview card
-    c1, c2, c3 = st.columns([1, 1, 2])
-    with c1:
-        st.metric("Preset clay", f"{preset_clay_lb:.2f} lb")
-    with c2:
-        st.metric("Preset glaze", f"{preset_glaze_g:.0f} g")
-    with c3:
-        if note:
-            st.caption(f"Notes. {note}")
-
-    st.caption("Apply the preset exactly or use a quick adjust first.")
-
-    # Quick adjust: percent up or down before applying
-    # Positive raises the preset, negative lowers it
-    adj_pct = st.slider("Adjust preset percent", -30, 30, 0, 1, key="preset_adjust_pct")
-    factor = 1.0 + adj_pct / 100.0
-    adj_clay = round(preset_clay_lb * factor, 3)
-    adj_glaze = round(preset_glaze_g * factor)
-
-    cA, cB, cC = st.columns(3)
-    cA.metric("Adjusted clay", f"{adj_clay:.2f} lb")
-    cB.metric("Adjusted glaze", f"{adj_glaze:.0f} g")
-
-    # Apply buttons
-    apply_both = cC.button("Apply clay and glaze", key="apply_preset_both")
-    apply_clay = cC.button("Apply clay only", key="apply_preset_clay")
-    apply_glaze = cC.button("Apply glaze only", key="apply_preset_glaze")
-
-    if apply_both:
-        ss.inputs["clay_weight_per_piece_lb"] = float(adj_clay)
-        ss.recipe_grams_per_piece = float(adj_glaze)
-        st.success("Applied preset clay and glaze.")
-    elif apply_clay:
-        ss.inputs["clay_weight_per_piece_lb"] = float(adj_clay)
-        st.success("Applied preset clay.")
-    elif apply_glaze:
-        ss.recipe_grams_per_piece = float(adj_glaze)
-        st.success("Applied preset glaze.")
-
-# Optional. Show your current vs preset to learn efficiency
-if choice != "None":
-    cur_clay = float(ss.inputs.get("clay_weight_per_piece_lb", 0.0))
-    if cur_clay > 0 and preset_clay_lb > 0:
-        diff = cur_clay - preset_clay_lb
-        pct = diff / preset_clay_lb * 100.0
-        sign = "more" if diff > 0 else "less"
-        st.caption(f"You are using {abs(diff):.2f} lb ({abs(pct):.1f} percent) {sign} clay than this preset.")
-
         st.subheader("Clay and packaging")
 
         ip["units_made"] = st.number_input("Units in this batch", min_value=1, value=int(ip["units_made"]), step=1)
@@ -337,8 +276,6 @@ if choice != "None":
         if "Cost_per_piece" in show_df.columns:
             show_df["Cost_per_piece"] = show_df["Cost_per_piece"].map(money)
         st.dataframe(show_df, use_container_width=True)
-        
-
 
         # ---- Other project materials (single table) ----
         st.subheader("Other project materials")
