@@ -330,90 +330,93 @@ with tabs[0]:
     # left column
     with left:
         # --- Form preset picker (with options) ---
-        st.subheader("Form preset")
+    st.subheader("Form preset")
 
-        # Safe access to the presets table
-        preset_df = ensure_cols(
-            ss.get("form_presets_df", pd.DataFrame()),
-            {"Form": "", "Clay_lb_wet": 0.0, "Default_glaze_g": 0.0, "Notes": ""}
+    preset_df = ensure_cols(
+        ss.get("form_presets_df", pd.DataFrame()),
+        {"Form": "", "Clay_lb_wet": 0.0, "Default_glaze_g": 0.0, "Notes": ""}
+    )
+
+    forms = list(preset_df["Form"]) if not preset_df.empty else []
+    choice = st.selectbox("Choose a form", ["None"] + forms, index=0, key="form_choice")
+
+    if choice != "None" and not preset_df.empty:
+        row = preset_df.loc[preset_df["Form"] == choice].iloc[0]
+        preset_clay_lb = float(row.get("Clay_lb_wet", 0.0))
+        preset_glaze_g = float(row.get("Default_glaze_g", 0.0))
+        note = str(row.get("Notes", "")).strip()
+
+        c1, c2, c3 = st.columns([1, 1, 2])
+        with c1:
+            st.metric("Preset clay", f"{preset_clay_lb:.2f} lb")
+        with c2:
+            st.metric("Preset glaze", f"{preset_glaze_g:.0f} g")
+        with c3:
+            if note:
+                st.caption(note)
+
+    # --- Clay and packaging ---
+    st.subheader("Clay and packaging")
+
+    ip["units_made"] = st.number_input(
+        "Units in this batch", min_value=1, value=int(ip["units_made"]), step=1
+    )
+    ip["clay_price_per_bag"] = st.number_input(
+        "Clay price per bag", min_value=0.0, value=float(ip["clay_price_per_bag"]), step=0.5
+    )
+    ip["clay_bag_weight_lb"] = st.number_input(
+        "Clay bag weight lb", min_value=0.1, value=float(ip["clay_bag_weight_lb"]), step=0.1
+    )
+    ip["clay_weight_per_piece_lb"] = st.number_input(
+        "Clay weight per piece lb wet", min_value=0.0, value=float(ip["clay_weight_per_piece_lb"]), step=0.1
+    )
+
+    ip["clay_yield"] = st.slider(
+        "Clay yield after trimming and loss",
+        min_value=0.5, max_value=1.0,
+        value=float(ip.get("clay_yield", 0.9)), step=0.01,
+        help="Fraction of the starting ball that ends up in the piece after trimming and losses."
+    )
+
+    throw_weight = float(ip.get("clay_weight_per_piece_lb", 0.0))
+    yield_frac = float(ip.get("clay_yield", 1.0))
+    effective_lb = throw_weight / max(yield_frac, 1e-9)
+    waste_pct = (1.0 - yield_frac) * 100.0
+    st.caption(f"You pay for about {effective_lb:.2f} lb of clay per finished piece given {waste_pct:.0f}% loss.")
+
+    ip["packaging_per_piece"] = st.number_input(
+        "Packaging per piece", min_value=0.0, value=float(ip["packaging_per_piece"]), step=0.1
+    )
+
+    # --- Glaze source ---
+    st.subheader("Glaze source")
+    glaze_source = st.radio(
+        "Glaze cost comes from", ["Recipe tab", "Manual table"], index=0, horizontal=True
+    )
+
+    if glaze_source == "Manual table":
+        st.caption("Edit names, cost per lb, and grams per piece.")
+        ss.glaze_piece_df = st.data_editor(
+            ensure_cols(ss.glaze_piece_df, {"Material": "", "Cost_per_lb": 0.0, "Grams_per_piece": 0.0}),
+            column_config={
+                "Material": st.column_config.TextColumn("Material", help="Raw material name"),
+                "Cost_per_lb": st.column_config.NumberColumn("Cost per lb", min_value=0.0, step=0.01),
+                "Grams_per_piece": st.column_config.NumberColumn("Grams per piece", min_value=0.0, step=0.1),
+            },
+            num_rows="dynamic",
+            use_container_width=True,
+            key="glaze_piece_editor_front",
         )
+        glaze_pp_cost, source_df = glaze_cost_from_piece_table(ss.glaze_piece_df)
+    else:
+        grams_pp = float(ss.get("recipe_grams_per_piece", 8.0))
+        source_df, glaze_pp_cost = glaze_per_piece_from_recipe(ss.catalog_df, ss.recipe_df, grams_pp)
 
-        # Build list of choices
-        forms = list(preset_df["Form"]) if not preset_df.empty else []
-        choice = st.selectbox("Choose a form", ["None"] + forms, index=0, key="form_choice")
-
-        # Preview the preset (do not change inputs yet)
-        if choice != "None" and not preset_df.empty:
-            row = preset_df.loc[preset_df["Form"] == choice].iloc[0]
-            preset_clay_lb = float(row.get("Clay_lb_wet", 0.0))
-            preset_glaze_g = float(row.get("Default_glaze_g", 0.0))
-            note = str(row.get("Notes", "")).strip()
-
-            # Show a little preview card
-            c1, c2, c3 = st.columns([1, 1, 2])
-            with c1:
-                st.metric("Preset clay", f"{preset_clay_lb:.2f} lb")
-            with c2:
-                st.metric("Preset glaze", f"{preset_glaze_g:.0f} g")
-            with c3:
-                if note:
-                    st.caption(note)
-
-
-        # --- Clay and packaging ---
-        st.subheader("Clay and packaging")
-        ip["units_made"] = st.number_input("Units in this batch", min_value=1, value=int(ip["units_made"]), step=1)
-        ip["clay_price_per_bag"] = st.number_input("Clay price per bag", min_value=0.0, value=float(ip["clay_price_per_bag"]), step=0.5)
-        ip["clay_bag_weight_lb"] = st.number_input("Clay bag weight lb", min_value=0.1, value=float(ip["clay_bag_weight_lb"]), step=0.1)
-        ip["clay_weight_per_piece_lb"] = st.number_input("Clay weight per piece lb wet", min_value=0.0, value=float(ip["clay_weight_per_piece_lb"]), step=0.1)
-
-        ip["clay_yield"] = st.slider(
-            "Clay yield after trimming and loss",
-            min_value=0.5, max_value=1.0,
-            value=float(ip.get("clay_yield", 0.9)), step=0.01,
-            help="Fraction of the starting ball that ends up in the piece after trimming and losses."
-        )
-
-        throw_weight = float(ip.get("clay_weight_per_piece_lb", 0.0))
-        yield_frac = float(ip.get("clay_yield", 1.0))
-        effective_lb = throw_weight / max(yield_frac, 1e-9)
-        waste_pct = (1.0 - yield_frac) * 100.0
-        st.caption(f"You pay for about {effective_lb:.2f} lb of clay per finished piece given {waste_pct:.0f}% loss.")
-
-        ip["packaging_per_piece"] = st.number_input("Packaging per piece", min_value=0.0, value=float(ip["packaging_per_piece"]), step=0.1)
-
-        # inside: with tabs[0]:  ...  with left:  ...
-
-    shrink_widget()   # <- adds the dropdown + calculators here only
-
-        
-       # --- Glaze source ---
-       st.subheader("Glaze source")
-        glaze_source = st.radio("Glaze cost comes from", ["Recipe tab", "Manual table"], index=0, horizontal=True)
-
-        if glaze_source == "Manual table":
-            st.caption("Edit names, cost per lb, and grams per piece.")
-            ss.glaze_piece_df = st.data_editor(
-                ensure_cols(ss.glaze_piece_df, {"Material": "", "Cost_per_lb": 0.0, "Grams_per_piece": 0.0}),
-                column_config={
-                    "Material": st.column_config.TextColumn("Material", help="Raw material name"),
-                    "Cost_per_lb": st.column_config.NumberColumn("Cost per lb", min_value=0.0, step=0.01),
-                    "Grams_per_piece": st.column_config.NumberColumn("Grams per piece", min_value=0.0, step=0.1),
-                },
-                num_rows="dynamic",
-                use_container_width=True,
-                key="glaze_piece_editor_front",
-            )
-            glaze_pp_cost, source_df = glaze_cost_from_piece_table(ss.glaze_piece_df)
-        else:
-            grams_pp = float(ss.get("recipe_grams_per_piece", 8.0))
-            source_df, glaze_pp_cost = glaze_per_piece_from_recipe(ss.catalog_df, ss.recipe_df, grams_pp)
-
-        st.subheader("Glaze per piece and cost")
-        show_df = source_df.copy()
-        if "Cost_per_piece" in show_df.columns:
-            show_df["Cost_per_piece"] = show_df["Cost_per_piece"].map(money)
-        st.dataframe(show_df, use_container_width=True)
+    st.subheader("Glaze per piece and cost")
+    show_df = source_df.copy()
+    if "Cost_per_piece" in show_df.columns:
+        show_df["Cost_per_piece"] = show_df["Cost_per_piece"].map(money)
+    st.dataframe(show_df, use_container_width=True)
 
     # right column
     with right:
