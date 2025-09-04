@@ -68,7 +68,7 @@ def other_materials_pp(df, pieces_in_project: int):
 
 # ------------ Session defaults ------------
 if "shrink_rate_pct" not in ss:
-    ss.shrink_rate_pct = 12.0   # typical stoneware range 10 to 15
+    ss.shrink_rate_pct = 14.0   # typical stoneware range 10 to 15
 if "shrink_units" not in ss:
     ss.shrink_units = "in"
 
@@ -433,7 +433,7 @@ with left:
         pieces = max(1, int(ip["units_made"]))
         base = ensure_cols(
             ss.other_mat_df,
-            {"Item":"", "Unit":"", "Cost_per_unit":0.0, "Quantity_for_project":0.0}
+            {"Item":"Beer", "Unit":"24", "Cost_per_unit":22.99, "Quantity_for_project":24.0}
         ).copy()
         base["Line_total"] = base["Cost_per_unit"] * base["Quantity_for_project"]
         base["Cost_per_piece"] = base["Line_total"] / pieces
