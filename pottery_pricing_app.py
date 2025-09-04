@@ -42,16 +42,29 @@ if "other_mat_df" not in ss:
 
 
 def other_materials_pp(df, pieces_in_project: int):
-    other_mat_df = ensure_cols(
-    ss.get("other_mat_df", pd.DataFrame()),
-    {"Item": "", "Unit": "", "Cost_per_unit": 0.0, "Quantity_for_project": 0.0}
-).to_dict(orient="list"),
+    """
+    Returns:
+      per_piece_cost, project_total, dataframe_with_Line_total_and_Cost_per_piece
+    Always safe with empty / malformed input.
+    """
+    base = ensure_cols(
+        df if isinstance(df, pd.DataFrame) else pd.DataFrame(),
+        {"Item": "", "Unit": "", "Cost_per_unit": 0.0, "Quantity_for_project": 0.0}
+    ).copy()
 
-    df2["Line_total"] = df2["Cost_per_unit"] * df2["Quantity_for_project"]
-    project_total = float(df2["Line_total"].sum())
-    per_piece = project_total / max(1, int(pieces_in_project))
-    df2["Cost_per_piece"] = df2["Line_total"] / max(1, int(pieces_in_project))
-    return per_piece, project_total, df2
+    # numeric cleanup
+    base["Cost_per_unit"] = pd.to_numeric(base["Cost_per_unit"], errors="coerce").fillna(0.0)
+    base["Quantity_for_project"] = pd.to_numeric(base["Quantity_for_project"], errors="coerce").fillna(0.0)
+
+    # totals
+    base["Line_total"] = base["Cost_per_unit"] * base["Quantity_for_project"]
+    pieces = max(1, int(pieces_in_project or 0))
+    base["Cost_per_piece"] = base["Line_total"] / pieces
+
+    project_total = float(base["Line_total"].sum()) if "Line_total" in base else 0.0
+    per_piece = project_total / pieces
+    return per_piece, project_total, base
+
 
 # ------------ Session defaults ------------
 if "shrink_rate_pct" not in ss:
