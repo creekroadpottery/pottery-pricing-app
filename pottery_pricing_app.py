@@ -384,7 +384,7 @@ with tabs[0]:
 
         # inside: with tabs[0]:  ...  with left:  ...
 
-shrink_widget()   # <- adds the dropdown + calculators here only
+    shrink_widget()   # <- adds the dropdown + calculators here only
 
         # --- Glaze source ---
         st.subheader("Glaze source")
