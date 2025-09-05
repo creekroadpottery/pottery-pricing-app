@@ -812,7 +812,7 @@ with tabs[0]:
             "Packaging per piece", min_value=0.0, value=float(ip["packaging_per_piece"]), step=0.1
         )
 
-        # --- Shrink tools  in one dropdown  only on this tab ---
+        # --- Shrink tools in one dropdown only on this tab ---
         with st.expander("Shrink rate helper", expanded=False):
             # compute shrink from a test tile
             st.markdown("**Compute from test tile**")
@@ -837,16 +837,16 @@ with tabs[0]:
                 ss.shrink_rate_pct = float(shrink_from_test)
                 st.toast("Shrink percent set", icon="✅")
 
-            # units and current rate preset
+            # units (WIDGET controls session_state)
             st.markdown("**Units**")
-            ss.shrink_units = st.radio(
+            units = st.radio(
                 "Units",
                 ["in", "mm", "cm"],
                 index=["in", "mm", "cm"].index(ss.get("shrink_units", "in")),
                 horizontal=True,
                 key="shrink_units",
             )
-            u = ss.shrink_units
+            u = units
 
             st.markdown("**Size converter**")
             rate = max(0.0, float(ss.get("shrink_rate_pct", 12.0))) / 100.0
