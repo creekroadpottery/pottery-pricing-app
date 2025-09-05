@@ -222,38 +222,158 @@ tabs = st.tabs([
     "Pricing", "Save and load", "Report", "About"
 ])
 
-# ------------ Per unit ------------
+# ------------- Per unit -------------
 with tabs[0]:
     ip = ss.inputs
     left, right = st.columns(2)
 
-    # left column
+    # ---------------- LEFT ----------------
     with left:
-        
+        # --- Form preset picker (with options) ---
+        st.subheader("Form preset")
+        preset_df = ensure_cols(
+            ss.get("form_presets_df", pd.DataFrame()),
+            {"Form": "", "Clay_lb_wet": 0.0, "Default_glaze_g": 0.0, "Notes": ""}
+        )
+        forms = list(preset_df["Form"]) if not preset_df.empty else []
+        choice = st.selectbox("Choose a form", ["None"] + forms, index=0, key="form_choice")
+
+        if choice != "None" and not preset_df.empty:
+            row = preset_df.loc[preset_df["Form"] == choice].iloc[0]
+            preset_clay_lb = float(row.get("Clay_lb_wet", 0.0))
+            preset_glaze_g = float(row.get("Default_glaze_g", 0.0))
+            note = str(row.get("Notes", "")).strip()
+
+            c1, c2, c3 = st.columns([1, 1, 2])
+            c1.metric("Preset clay", f"{preset_clay_lb:.2f} lb")
+            c2.metric("Preset glaze", f"{preset_glaze_g:.0f} g")
+            if note:
+                c3.caption(note)
+
+        # --- Clay and packaging ---
         st.subheader("Clay and packaging")
-
-        ip["units_made"] = st.number_input("Units in this batch", min_value=1, value=int(ip["units_made"]), step=1)
-        ip["clay_price_per_bag"] = st.number_input("Clay price per bag", min_value=0.0, value=float(ip["clay_price_per_bag"]), step=0.5)
-        ip["clay_bag_weight_lb"] = st.number_input("Clay bag weight lb", min_value=0.1, value=float(ip["clay_bag_weight_lb"]), step=0.1)
-        ip["clay_weight_per_piece_lb"] = st.number_input("Clay weight per piece lb wet", min_value=0.0, value=float(ip["clay_weight_per_piece_lb"]), step=0.1)
-
+        ip["units_made"] = st.number_input(
+            "Units in this batch", min_value=1, value=int(ip["units_made"]), step=1
+        )
+        ip["clay_price_per_bag"] = st.number_input(
+            "Clay price per bag", min_value=0.0, value=float(ip["clay_price_per_bag"]), step=0.5
+        )
+        ip["clay_bag_weight_lb"] = st.number_input(
+            "Clay bag weight lb", min_value=0.1, value=float(ip["clay_bag_weight_lb"]), step=0.1
+        )
+        ip["clay_weight_per_piece_lb"] = st.number_input(
+            "Clay weight per piece lb wet", min_value=0.0, value=float(ip["clay_weight_per_piece_lb"]), step=0.1
+        )
         ip["clay_yield"] = st.slider(
             "Clay yield after trimming and loss",
             min_value=0.5, max_value=1.0,
             value=float(ip.get("clay_yield", 0.9)), step=0.01,
-            help="Fraction of the starting ball that ends up in the piece after trimming and losses. 1.00 means no loss. 0.85 means 15 percent loss."
+            help="Fraction of the starting ball that ends up in the piece after trimming and losses."
         )
-
         throw_weight = float(ip.get("clay_weight_per_piece_lb", 0.0))
         yield_frac = float(ip.get("clay_yield", 1.0))
         effective_lb = throw_weight / max(yield_frac, 1e-9)
         waste_pct = (1.0 - yield_frac) * 100.0
         st.caption(f"You pay for about {effective_lb:.2f} lb of clay per finished piece given {waste_pct:.0f}% loss.")
+        ip["packaging_per_piece"] = st.number_input(
+            "Packaging per piece", min_value=0.0, value=float(ip["packaging_per_piece"]), step=0.1
+        )
 
-        ip["packaging_per_piece"] = st.number_input("Packaging per piece", min_value=0.0, value=float(ip["packaging_per_piece"]), step=0.1)
+        # --- Shrink tools  in one dropdown  only on this tab ---
+        with st.expander("Shrink rate helper", expanded=False):
+            # compute shrink from a test tile
+            st.markdown("**Compute from test tile**")
+            c1, c2, c3 = st.columns([1, 1, 1])
+            wet_len = c1.number_input(
+                "Wet length",
+                min_value=0.0,
+                value=float(ss.get("sh_wet_len", 10.00)),
+                step=0.01,
+                key="sh_wet_len",
+            )
+            fired_len = c2.number_input(
+                "Fired length",
+                min_value=0.0,
+                value=float(ss.get("sh_fired_len", 8.80)),
+                step=0.01,
+                key="sh_fired_len",
+            )
+            shrink_from_test = 0.0 if wet_len <= 0 else max(0.0, (wet_len - fired_len) / wet_len * 100.0)
+            c3.metric("Shrink from test", f"{shrink_from_test:.2f}%")
+            if st.button("Use this shrink percent", key="btn_use_shrink_pct"):
+                ss.shrink_rate_pct = float(shrink_from_test)
+                st.toast("Shrink percent set", icon="✅")
 
+            # units and current rate preset
+            st.markdown("**Units**")
+            ss.shrink_units = st.radio(
+                "Units",
+                ["in", "mm", "cm"],
+                index=["in", "mm", "cm"].index(ss.get("shrink_units", "in")),
+                horizontal=True,
+                key="shrink_units",
+            )
+            u = ss.shrink_units
+
+            st.markdown("**Size converter**")
+            rate = max(0.0, float(ss.get("shrink_rate_pct", 12.0))) / 100.0
+            s1, s2, s3 = st.columns([1, 1, 1])
+            wet_size = s1.number_input(
+                f"Wet size ({u})",
+                min_value=0.0,
+                value=float(ss.get("sh_wet_size", 4.00)),
+                step=0.001,
+                key="sh_wet_size",
+            )
+            target_fired = s2.number_input(
+                f"Target fired size ({u})",
+                min_value=0.0,
+                value=float(ss.get("sh_target", 3.52)),
+                step=0.001,
+                key="sh_target",
+            )
+            fired_from_wet = wet_size * (1.0 - rate)
+            s3.metric("Fired from wet", f"{fired_from_wet:.3f} {u}")
+            needed_wet = target_fired / max(1e-9, (1.0 - rate))
+            st.caption(f"To end at {target_fired:.3f} {u}, throw about {needed_wet:.3f} in wet.")
+
+            st.markdown("**Lid remake helper**")
+            st.caption("Measure the fired rim outside diameter on the pot. Choose a small clearance to keep the fit comfortable.")
+            l1, l2, l3 = st.columns([1, 1, 1])
+            fired_rim_od = l1.number_input(
+                f"Fired rim outside diameter ({u})",
+                min_value=0.0,
+                value=float(ss.get("lid_fired_od", 3.00)),
+                step=0.001,
+                key="lid_fired_od",
+            )
+            default_clear = 0.03 if u == "in" else 0.8 if u == "mm" else 0.08
+            clearance = l2.number_input(
+                f"Extra diameter for clearance ({u})",
+                min_value=0.0,
+                value=float(ss.get("lid_clearance", default_clear)),
+                step=0.001,
+                key="lid_clearance",
+            )
+            wet_gallery_needed = (fired_rim_od + clearance) / max(1e-9, (1.0 - rate))
+            l3.metric("Wet gallery inner diameter to throw", f"{wet_gallery_needed:.3f} {u}")
+
+            st.caption("Reverse check if you already threw a lid")
+            lid_wet_id = st.number_input(
+                f"Wet gallery inner diameter you threw ({u})",
+                min_value=0.0,
+                value=float(ss.get("lid_wet_id", wet_gallery_needed)),
+                step=0.001,
+                key="lid_wet_id",
+            )
+            expected_fired_id = lid_wet_id * (1.0 - rate)
+            st.write(f"Expected fired gallery inner diameter: **{expected_fired_id:.3f} {u}**")
+
+        # --- Glaze source ---
         st.subheader("Glaze source")
-        glaze_source = st.radio("Glaze cost comes from", ["Recipe tab", "Manual table"], index=0, horizontal=True)
+        glaze_source = st.radio(
+            "Glaze cost comes from", ["Recipe tab", "Manual table"], index=0, horizontal=True
+        )
 
         if glaze_source == "Manual table":
             st.caption("Edit names, cost per lb, and grams per piece.")
@@ -279,13 +399,15 @@ with tabs[0]:
             show_df["Cost_per_piece"] = show_df["Cost_per_piece"].map(money)
         st.dataframe(show_df, use_container_width=True)
 
-        # ---- Other project materials (single table) ----
+    # ---------------- RIGHT ----------------
+    with right:
+        # Other project materials editor
         st.subheader("Other project materials")
         st.caption("Add one-time items for this batch. The cost is divided by the number of pieces in this batch.")
 
         pieces = max(1, int(ip["units_made"]))
         base = ensure_cols(
-            ss.other_mat_df,
+            ss.get("other_mat_df", pd.DataFrame()),
             {"Item":"", "Unit":"", "Cost_per_unit":0.0, "Quantity_for_project":0.0}
         ).copy()
         base["Line_total"] = base["Cost_per_unit"] * base["Quantity_for_project"]
@@ -310,8 +432,7 @@ with tabs[0]:
         other_pp = project_total / pieces
         st.caption(f"Project total {money(project_total)} • Adds {money(other_pp)} per piece")
 
-    # right column
-    with right:
+        # Totals
         st.subheader("Per piece totals")
         totals = calc_totals(ip, glaze_pp_cost, other_pp)
         c = st.columns(3)
@@ -321,65 +442,6 @@ with tabs[0]:
         st.metric("Other project materials", money(totals["other_pp"]))
         st.metric("Total cost per piece", money(totals["total_pp"]))
 
-with st.expander("Shrink rate helper"):
-    # current shrink setting
-    ss.shrink_rate_pct = st.number_input(
-        "Shrink percent",
-        min_value=0.0, max_value=30.0,
-        value=float(ss.shrink_rate_pct), step=0.1,
-        help="Overall linear shrink from wet to fired. 12 means 12 percent."
-    )
-    rate = ss.shrink_rate_pct / 100.0
-
-    st.divider()
-
-    # compute from a quick test tile
-    st.markdown("**Compute from test tile**")
-    c1, c2, c3 = st.columns([1, 1, 1])
-    wet_len = c1.number_input("Wet length", min_value=0.0, value=10.0, step=0.1)
-    fired_len = c2.number_input("Fired length", min_value=0.0, value=8.8, step=0.1)
-    if wet_len > 0:
-        calc_pct = max(0.0, (wet_len - fired_len) / wet_len * 100.0)
-        c3.metric("Shrink from test", f"{calc_pct:.2f}%")
-        if st.button("Use this shrink percent"):
-            ss.shrink_rate_pct = calc_pct
-            rate = ss.shrink_rate_pct / 100.0
-            st.success(f"Shrink percent set to {calc_pct:.2f}%")
-
-    st.divider()
-
-    # unit choice for the size calculators
-    ss.shrink_units = st.radio("Units", ["in", "mm"], index=(0 if ss.shrink_units == "in" else 1), horizontal=True)
-
-    # wet -> fired, fired -> wet
-    st.markdown("**Size converter**")
-    sc1, sc2, sc3 = st.columns([1, 1, 1])
-    wet_size = sc1.number_input(f"Wet size ({ss.shrink_units})", min_value=0.0, value=4.00, step=0.01)
-    fired_size_target = sc2.number_input(f"Target fired size ({ss.shrink_units})", min_value=0.0, value=3.52, step=0.01)
-
-    fired_from_wet = wet_size * (1.0 - rate)
-    wet_needed_for_target = fired_size_target / max(1e-9, 1.0 - rate)
-
-    sc3.metric("Fired from wet", f"{fired_from_wet:.3f} {ss.shrink_units}")
-    st.caption(f"To end at {fired_size_target:.3f} {ss.shrink_units}, throw about {wet_needed_for_target:.3f} {ss.shrink_units} wet.")
-
-    st.divider()
-
-    # lid remake helper
-    st.markdown("**Lid remake helper**")
-    st.caption("Measure the fired rim outside diameter on the pot. Choose a small clearance to keep the fit comfortable.")
-    lc1, lc2, lc3 = st.columns([1, 1, 1])
-
-    fired_rim_od = lc1.number_input(f"Fired rim outside diameter ({ss.shrink_units})", min_value=0.0, value=3.00, step=0.01)
-    clearance = lc2.number_input(f"Extra diameter for clearance ({ss.shrink_units})", min_value=0.0, value=(0.03 if ss.shrink_units == 'in' else 0.8), step=0.01)
-    wet_gallery_id_needed = (fired_rim_od + clearance) / max(1e-9, 1.0 - rate)
-    lc3.metric("Wet gallery inner diameter to throw", f"{wet_gallery_id_needed:.3f} {ss.shrink_units}")
-
-    # reverse check
-    st.caption("Reverse check if you already threw a lid:")
-    lid_wet_id = st.number_input(f"Wet gallery inner diameter you threw ({ss.shrink_units})", min_value=0.0, value=wet_gallery_id_needed, step=0.01)
-    expected_fired_id = lid_wet_id * (1.0 - rate)
-    st.write(f"Expected fired gallery inner diameter: **{expected_fired_id:.3f} {ss.shrink_units}**")
 
 
 # ------------ Glaze recipe ------------
