@@ -404,6 +404,96 @@ def init_form_presets_in_state():
     if "Notes" not in ss.form_presets_df.columns:
         ss.form_presets_df["Notes"] = ""
 
+# ---------- Preset categorizer ----------
+CATEGORY_ORDER = [
+    "Mugs and cups",          # most common first
+    "Bowls",
+    "Plates and platters",
+    "Drinkware and bar",
+    "Bakeware and ovensafe",
+    "Serveware and table",
+    "Jars and canisters",
+    "Teaware and coffee",
+    "Pitchers and ewers",
+    "Cookware and kitchen",
+    "Lighting and decor",
+    "Planters and garden",
+    "Tiles and fixtures",
+    "Sculpture and art",
+    "Specialty and other",
+]
+
+def infer_category(name: str) -> str:
+    n = str(name).lower()
+
+    # Mugs and cups
+    if any(k in n for k in ["mug", "cup", "demitasse", "espresso", "teacup", "soup mug"]):
+        return "Mugs and cups"
+
+    # Bowls
+    if any(k in n for k in ["bowl", "ramekin", "donburi", "noodle", "ramen", "pho", "custard", "trifle", "compote"]):
+        return "Bowls"
+
+    # Plates and platters
+    if any(k in n for k in ["plate", "platter", "tray", "sushi plate", "square plate", "oval platter", "rectangular platter"]):
+        return "Plates and platters"
+
+    # Drinkware and bar
+    if any(k in n for k in ["stein", "goblet", "tumbler", "highball", "lowball", "martini", "coupe", "shot", "wine"]):
+        return "Drinkware and bar"
+
+    # Bakeware and ovensafe
+    if any(k in n for k in ["pie", "tart", "bread pan", "loaf", "bundt", "baker", "baking", "casserole", "lasagna", "gratin", "soufflé", "tagine", "dutch oven", "roaster", "pizza stone", "cloche"]):
+        return "Bakeware and ovensafe"
+
+    # Serveware and table
+    if any(k in n for k in ["serving", "chip and dip", "chip", "dip", "relish", "divided dish", "butter dish", "salt pig", "salt cellar", "spice jar", "utensil crock", "ladle"]):
+        return "Serveware and table"
+
+    # Jars and canisters
+    if any(k in n for k in ["jar", "canister", "storage", "cookie jar", "urn"]):
+        return "Jars and canisters"
+
+    # Teaware and coffee
+    if any(k in n for k in ["teapot", "tea", "pour-over", "french press", "coffee server", "creamer", "sugar"]):
+        return "Teaware and coffee"
+
+    # Pitchers and ewers
+    if any(k in n for k in ["pitcher", "ewer", "cruet"]):
+        return "Pitchers and ewers"
+
+    # Cookware and kitchen
+    if any(k in n for k in ["colander", "mortar", "pestle", "strainer", "soup tureen", "sauce pot", "pan", "tagine", "tandoor", "kitchen utensil holder", "oil burner"]):
+        return "Cookware and kitchen"
+
+    # Lighting and decor
+    if any(k in n for k in ["candle", "candlestick", "lantern", "luminary", "lamp base", "clock", "mask", "votive"]):
+        return "Lighting and decor"
+
+    # Planters and garden
+    if any(k in n for k in ["planter", "garden", "bird", "wind chime", "wind bell", "stepping stone", "fountain", "birdbath", "bird bath"]):
+        return "Planters and garden"
+
+    # Tiles and fixtures
+    if any(k in n for k in ["tile", "trivet", "switch plate"]):
+        return "Tiles and fixtures"
+
+    # Sculpture and art
+    if any(k in n for k in ["sculpture", "bust", "relief", "totem", "column", "capital", "columbarium"]):
+        return "Sculpture and art"
+
+    return "Specialty and other"
+
+def sort_by_category_then_form(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    if "Category" not in df.columns:
+        df["Category"] = df["Form"].apply(infer_category)
+    order_map = {cat: i for i, cat in enumerate(CATEGORY_ORDER)}
+    df["__cat_rank"] = df["Category"].map(order_map).fillna(len(CATEGORY_ORDER)).astype(int)
+    df = df.sort_values(["__cat_rank", "Form"], kind="stable").drop(columns="__cat_rank")
+    return df
+
+
 # Call init early in your script (after you define ss = st.session_state)
 init_form_presets_in_state()
 
