@@ -812,6 +812,96 @@ with tabs[0]:
             "Packaging per piece", min_value=0.0, value=float(ip["packaging_per_piece"]), step=0.1
         )
 
+        # --- Shrink tools  in one dropdown  only on this tab ---
+        with st.expander("Shrink rate helper", expanded=False):
+            # compute shrink from a test tile
+            st.markdown("**Compute from test tile**")
+            c1, c2, c3 = st.columns([1, 1, 1])
+            wet_len = c1.number_input(
+                "Wet length",
+                min_value=0.0,
+                value=float(ss.get("sh_wet_len", 10.00)),
+                step=0.01,
+                key="sh_wet_len",
+            )
+            fired_len = c2.number_input(
+                "Fired length",
+                min_value=0.0,
+                value=float(ss.get("sh_fired_len", 8.80)),
+                step=0.01,
+                key="sh_fired_len",
+            )
+            shrink_from_test = 0.0 if wet_len <= 0 else max(0.0, (wet_len - fired_len) / wet_len * 100.0)
+            c3.metric("Shrink from test", f"{shrink_from_test:.2f}%")
+            if st.button("Use this shrink percent", key="btn_use_shrink_pct"):
+                ss.shrink_rate_pct = float(shrink_from_test)
+                st.toast("Shrink percent set", icon="✅")
+
+            # units and current rate preset
+            st.markdown("**Units**")
+            ss.shrink_units = st.radio(
+                "Units",
+                ["in", "mm", "cm"],
+                index=["in", "mm", "cm"].index(ss.get("shrink_units", "in")),
+                horizontal=True,
+                key="shrink_units",
+            )
+            u = ss.shrink_units
+
+            st.markdown("**Size converter**")
+            rate = max(0.0, float(ss.get("shrink_rate_pct", 12.0))) / 100.0
+            s1, s2, s3 = st.columns([1, 1, 1])
+            wet_size = s1.number_input(
+                f"Wet size ({u})",
+                min_value=0.0,
+                value=float(ss.get("sh_wet_size", 4.00)),
+                step=0.001,
+                key="sh_wet_size",
+            )
+            target_fired = s2.number_input(
+                f"Target fired size ({u})",
+                min_value=0.0,
+                value=float(ss.get("sh_target", 3.52)),
+                step=0.001,
+                key="sh_target",
+            )
+            fired_from_wet = wet_size * (1.0 - rate)
+            s3.metric("Fired from wet", f"{fired_from_wet:.3f} {u}")
+            needed_wet = target_fired / max(1e-9, (1.0 - rate))
+            st.caption(f"To end at {target_fired:.3f} {u}, throw about {needed_wet:.3f} in wet.")
+
+            st.markdown("**Lid remake helper**")
+            st.caption("Measure the fired rim outside diameter on the pot. Choose a small clearance to keep the fit comfortable.")
+            l1, l2, l3 = st.columns([1, 1, 1])
+            fired_rim_od = l1.number_input(
+                f"Fired rim outside diameter ({u})",
+                min_value=0.0,
+                value=float(ss.get("lid_fired_od", 3.00)),
+                step=0.001,
+                key="lid_fired_od",
+            )
+            default_clear = 0.03 if u == "in" else 0.8 if u == "mm" else 0.08
+            clearance = l2.number_input(
+                f"Extra diameter for clearance ({u})",
+                min_value=0.0,
+                value=float(ss.get("lid_clearance", default_clear)),
+                step=0.001,
+                key="lid_clearance",
+            )
+            wet_gallery_needed = (fired_rim_od + clearance) / max(1e-9, (1.0 - rate))
+            l3.metric("Wet gallery inner diameter to throw", f"{wet_gallery_needed:.3f} {u}")
+
+            st.caption("Reverse check if you already threw a lid")
+            lid_wet_id = st.number_input(
+                f"Wet gallery inner diameter you threw ({u})",
+                min_value=0.0,
+                value=float(ss.get("lid_wet_id", wet_gallery_needed)),
+                step=0.001,
+                key="lid_wet_id",
+            )
+            expected_fired_id = lid_wet_id * (1.0 - rate)
+            st.write(f"Expected fired gallery inner diameter: **{expected_fired_id:.3f} {u}**")
+
         # ---------- Glaze source ----------
         st.subheader("Glaze source")
         glaze_source = st.radio(
