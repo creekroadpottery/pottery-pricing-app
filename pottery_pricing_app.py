@@ -14,12 +14,12 @@ def inject_theme_css():
         """
         <style>
             :root{
-              --crp-bg:      #0e1117;      /* app background (dark) */
-              --crp-card:    #11151c;      /* card background */
-              --crp-text:    #e6eef8;      /* base text */
-              --crp-muted:   #aab6c4;      /* helper text */
-              --crp-accent:  #d2a679;      /* clay/terra accent */
-              --crp-accent-2:#7db6d4;      /* cool secondary (slip/ash) */
+              --crp-bg:      #0e1117; 
+              --crp-card:    #11151c;
+              --crp-text:    #e6eef8; 
+              --crp-muted:   #aab6c4;
+              --crp-accent:  #d2a679;
+              --crp-accent-2:#7db6d4;
             }
             @media (prefers-color-scheme: light){
               :root{
@@ -32,14 +32,24 @@ def inject_theme_css():
               }
             }
 
-            /* App background and text */
+            /* App background and base text */
             .main, .stApp { background: var(--crp-bg) !important; color: var(--crp-text); }
 
-            /* Headings */
-            .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 { color: var(--crp-text) !important; }
-            .stMarkdown p, .stMarkdown small, .stCaption, .st-emotion-cache-10trblm { color: var(--crp-muted) !important; }
+            /* Headings — brighter and stronger */
+            h1, h2, h3, .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
+              color: var(--crp-accent-2) !important; 
+              font-weight: 700 !important;
+            }
 
-            /* Card */
+            /* Subheaders (st.subheader) */
+            .stMarkdown h2, .stMarkdown h3, .stSubheader {
+              color: var(--crp-accent) !important;
+            }
+
+            /* Paragraph and muted text */
+            .stMarkdown p, .stCaption, .st-emotion-cache-10trblm { color: var(--crp-muted) !important; }
+
+            /* Card styling */
             .crp-card{
               background: var(--crp-card);
               border-radius: 14px;
@@ -48,19 +58,20 @@ def inject_theme_css():
               margin: 14px 0 18px 0;
               border: 1px solid rgba(255,255,255,.05);
             }
-            .crp-card h2, .crp-card h3{ margin-top: 0; }
 
-            /* Data editor / dataframe rounding */
+            /* Data editor & dataframe */
             .stDataFrame, .stDataEditor { border-radius: 12px; overflow: hidden; }
 
-            /* Buttons, radios, sliders tint */
+            /* Buttons */
             .stButton>button{
               background: var(--crp-accent) !important;
-              color: white !important; border: none !important;
+              color: white !important;
+              border: none !important;
               border-radius: 10px !important;
             }
             .stButton>button:hover{ filter: brightness(0.95); }
 
+            /* Slider and radio tint */
             .stSlider [data-baseweb="slider"] { color: var(--crp-accent) !important; }
             .stRadio [data-baseweb="radio"] label { color: var(--crp-text) !important; }
 
@@ -75,11 +86,6 @@ def inject_theme_css():
         unsafe_allow_html=True,
     )
 
-def card_start():
-    st.markdown('<div class="crp-card">', unsafe_allow_html=True)
-
-def card_end():
-    st.markdown('</div>', unsafe_allow_html=True)
 
 inject_theme_css()
 # ---------- end CSS ----------
