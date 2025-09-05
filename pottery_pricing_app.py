@@ -899,7 +899,7 @@ with tabs[0]:
     with left:
         # ---------- Form preset picker + manager ----------
         
-        card_start()
+        
         st.subheader("Form preset")
 
         # Safe copy of presets table (created by init_form_presets_in_state)
@@ -990,7 +990,7 @@ with tabs[0]:
                 key="form_presets_editor",
             )
             ss.form_presets_df = edited.copy()
-            card_end()
+            
 
         # ---------- Clay & packaging ----------
         card_start()
