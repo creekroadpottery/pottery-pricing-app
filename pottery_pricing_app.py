@@ -1043,7 +1043,7 @@ with tabs[0]:
         ip["packaging_per_piece"] = st.number_input(
             "Packaging per piece", min_value=0.0, value=float(ip["packaging_per_piece"]), step=0.1
         )
-         card_end()
+        card_end()
 
         # --- Shrink tools in one dropdown only on this tab ---
         card_start()
