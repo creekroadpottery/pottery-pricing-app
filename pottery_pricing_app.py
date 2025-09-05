@@ -22,9 +22,9 @@ def inject_theme_css():
                 --crp-bg:      #f7f7f9;
                 --crp-card:    #ffffff;
                 --crp-text:    #1f2937;
-                --crp-muted:   #6b7280;
-                --crp-accent:  #a06a2f;
-                --crp-accent-2:#2f6ea0;
+                --crp-muted:   #1f2937;
+                --crp-accent:  #1f2937;
+                --crp-accent-2:#1f2937;
               }
             }
 
