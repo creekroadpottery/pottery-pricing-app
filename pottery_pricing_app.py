@@ -289,26 +289,90 @@ with tabs[0]:
 
     # ---------------- LEFT ----------------
     with left:
-        # --- Form preset picker (with options) ---
-        st.subheader("Form preset")
-        preset_df = ensure_cols(
-            ss.get("form_presets_df", pd.DataFrame()),
-            {"Form": "", "Clay_lb_wet": 0.0, "Default_glaze_g": 0.0, "Notes": ""}
-        )
-        forms = list(preset_df["Form"]) if not preset_df.empty else []
-        choice = st.selectbox("Choose a form", ["None"] + forms, index=0, key="form_choice")
+        # --- Form preset picker (with apply + manager) ---
+st.subheader("Form preset")
 
-        if choice != "None" and not preset_df.empty:
-            row = preset_df.loc[preset_df["Form"] == choice].iloc[0]
-            preset_clay_lb = float(row.get("Clay_lb_wet", 0.0))
-            preset_glaze_g = float(row.get("Default_glaze_g", 0.0))
-            note = str(row.get("Notes", "")).strip()
+# Safe copy
+presets_df = ss.form_presets_df.copy()
 
-            c1, c2, c3 = st.columns([1, 1, 2])
-            c1.metric("Preset clay", f"{preset_clay_lb:.2f} lb")
-            c2.metric("Preset glaze", f"{preset_glaze_g:.0f} g")
-            if note:
-                c3.caption(note)
+# Build list for dropdown
+forms = list(presets_df["Form"]) if not presets_df.empty else []
+choice = st.selectbox("Choose a form", ["None"] + forms, index=0, key="form_choice")
+
+# Preview + apply
+if choice != "None" and not presets_df.empty:
+    row = presets_df.loc[presets_df["Form"] == choice].iloc[0]
+    preset_clay_lb = float(row.get("Clay_lb_wet", 0.0))
+    preset_glaze_g = float(row.get("Default_glaze_g", 0.0))
+    note = str(row.get("Notes", "")).strip()
+
+    c1, c2, c3 = st.columns([1, 1, 2])
+    c1.metric("Preset clay", f"{preset_clay_lb:.2f} lb")
+    c2.metric("Preset glaze", f"{preset_glaze_g:.0f} g")
+    if note:
+        c3.caption(note)
+
+    # Button to apply these values to the working inputs
+    if st.button("Use this preset", key="apply_preset_btn"):
+        ip["clay_weight_per_piece_lb"] = preset_clay_lb
+        ss.recipe_grams_per_piece = preset_glaze_g
+        st.success("Preset applied to clay weight and glaze grams per piece.")
+
+# Manage presets (import/export/edit)
+with st.expander("Manage presets (CSV import/export, inline edit)"):
+    st.caption("Columns must be: Form, Clay_lb_wet, Default_glaze_g, Notes")
+
+    # Export button
+    csv_bytes = ss.form_presets_df.to_csv(index=False).encode("utf-8")
+    st.download_button("Download presets CSV", csv_bytes, file_name="form_presets.csv", mime="text/csv")
+
+    # Upload / merge
+    col_u1, col_u2 = st.columns([1, 1])
+    with col_u1:
+        mode = st.radio("When uploading", ["Replace", "Append"], horizontal=True, key="presets_upload_mode")
+    with col_u2:
+        up = st.file_uploader("Upload presets CSV", type=["csv"], key="presets_csv_uploader")
+
+    if up is not None:
+        try:
+            new_df = pd.read_csv(up)
+            # ensure required columns
+            for c in ["Form", "Clay_lb_wet", "Default_glaze_g", "Notes"]:
+                if c not in new_df.columns:
+                    new_df[c] = "" if c in ("Form", "Notes") else 0.0
+            new_df = new_df[["Form", "Clay_lb_wet", "Default_glaze_g", "Notes"]].copy()
+            new_df["Form"] = new_df["Form"].astype(str).str.strip()
+            new_df["Clay_lb_wet"] = pd.to_numeric(new_df["Clay_lb_wet"], errors="coerce").fillna(0.0)
+            new_df["Default_glaze_g"] = pd.to_numeric(new_df["Default_glaze_g"], errors="coerce").fillna(0.0)
+
+            if mode == "Replace":
+                ss.form_presets_df = new_df
+            else:  # Append, keeping the last entry for duplicate Form names
+                base = ss.form_presets_df.copy()
+                combo = pd.concat([base, new_df], ignore_index=True)
+                ss.form_presets_df = combo.drop_duplicates(subset=["Form"], keep="last").reset_index(drop=True)
+
+            st.success(f"Loaded {len(new_df)} presets.")
+        except Exception as e:
+            st.error(f"Could not read CSV. {e}")
+
+    # Inline editor
+    st.caption("Edit rows below (add/delete allowed).")
+    edited = st.data_editor(
+        ss.form_presets_df,
+        column_config={
+            "Form": st.column_config.TextColumn("Form"),
+            "Clay_lb_wet": st.column_config.NumberColumn("Clay (lb, wet)", min_value=0.0, step=0.05),
+            "Default_glaze_g": st.column_config.NumberColumn("Default glaze (g)", min_value=0.0, step=1.0),
+            "Notes": st.column_config.TextColumn("Notes"),
+        },
+        num_rows="dynamic",
+        use_container_width=True,
+        key="form_presets_editor",
+    )
+    # Save back
+    ss.form_presets_df = edited.copy()
+
 
         # --- Clay and packaging ---
         st.subheader("Clay and packaging")
