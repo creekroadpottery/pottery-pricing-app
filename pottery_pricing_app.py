@@ -481,7 +481,7 @@ def load_default_presets() -> pd.DataFrame:
             {"Form": "Relish dish (long)",          "Clay_lb_wet": 1.20, "Default_glaze_g": 50,  "Notes": ""},
             {"Form": "Tray w/ handles (small)",     "Clay_lb_wet": 1.80, "Default_glaze_g": 75,  "Notes": ""},
             {"Form": "Tray w/ handles (large)",     "Clay_lb_wet": 3.00, "Default_glaze_g": 115, "Notes": ""},
-            {"Form": "Deviled egg plate",           "Clay_lb_wet": 2.40, "Default_glaze_g": 100, "Notes": "12 wells"}
+            {"Form": "Deviled egg plate",           "Clay_lb_wet": 2.40, "Default_glaze_g": 100, "Notes": "12 wells"},
             {"Form": "Mortar & pestle (small)",     "Clay_lb_wet": 1.60, "Default_glaze_g": 65,  "Notes": ""},
             {"Form": "Mortar & pestle (large)",     "Clay_lb_wet": 2.75, "Default_glaze_g": 105, "Notes": ""},
             {"Form": "Colander (small)",            "Clay_lb_wet": 1.80, "Default_glaze_g": 75,  "Notes": "pierced"},
