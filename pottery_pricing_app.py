@@ -433,7 +433,7 @@ def load_default_presets() -> pd.DataFrame:
             {"Form": "Cheese dome (small)",         "Clay_lb_wet": 2.25, "Default_glaze_g": 95,  "Notes": "with plate"},
             {"Form": "Chip and dip set",            "Clay_lb_wet": 4.00, "Default_glaze_g": 140, "Notes": "2-piece"},
             {"Form": "Relish tray (3-section)",     "Clay_lb_wet": 2.75, "Default_glaze_g": 100, "Notes": ""},
-            {"Form": "Divided dish (oval)",         "Clay_lb_wet": 2.50, "Default_glaze_g": 95,  "Notes": ""}
+            {"Form": "Divided dish (oval)",         "Clay_lb_wet": 2.50, "Default_glaze_g": 95,  "Notes": ""},
             {"Form": "Dinner plate (8 in)",         "Clay_lb_wet": 1.80, "Default_glaze_g": 85,  "Notes": ""},
             {"Form": "Dinner plate (9 in)",         "Clay_lb_wet": 2.10, "Default_glaze_g": 95,  "Notes": ""},
             {"Form": "Dinner plate (10 in)",        "Clay_lb_wet": 2.50, "Default_glaze_g": 110, "Notes": ""},
