@@ -38,10 +38,10 @@ def inject_theme_css():
             /* Card */
             .crp-card{
               background: var(--crp-card);
-              border-radius: 14px;
-              box-shadow: 0 8px 24px rgba(0,0,0,.25);
-              padding: 16px 18px;
-              margin: 14px 0 18px 0;
+              border-radius: 7px;
+              box-shadow: 0 4px 12px rgba(0,0,0,.25);
+              padding: 8px 9px;
+              margin: 7px 0 9px 0;
               border: 1px solid rgba(255,255,255,.05);
             }
             .crp-card h2, .crp-card h3{ margin-top: 0; }
