@@ -229,6 +229,7 @@ with tabs[0]:
 
     # left column
     with left:
+        render_shrink_tools()
         st.subheader("Clay and packaging")
 
         ip["units_made"] = st.number_input("Units in this batch", min_value=1, value=int(ip["units_made"]), step=1)
@@ -308,7 +309,6 @@ with tabs[0]:
         project_total = float(ss.other_mat_df["Line_total"].sum()) if "Line_total" in ss.other_mat_df else 0.0
         other_pp = project_total / pieces
         st.caption(f"Project total {money(project_total)} • Adds {money(other_pp)} per piece")
-        render_shrink_tools()
 
     # right column
     with right:
