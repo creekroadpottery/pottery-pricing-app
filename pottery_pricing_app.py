@@ -12,8 +12,8 @@ def inject_theme_css():
             :root{
               --crp-bg:      #0e1117;      /* app background (dark) */
               --crp-card:    #11151c;      /* card background */
-              --crp-text:    #e6eef8;      /* base text */
-              --crp-muted:   #aab6c4;      /* helper text */
+              --crp-text:    #1f2937;      /* base text */
+              --crp-muted:   #1f2937;      /* helper text */
               --crp-accent:  #d2a679;      /* clay/terra accent */
               --crp-accent-2:#7db6d4;      /* cool secondary (slip/ash) */
             }
