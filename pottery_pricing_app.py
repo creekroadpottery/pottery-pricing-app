@@ -15,7 +15,7 @@ def inject_theme_css():
               --crp-text:    #1f2937;      /* base text */
               --crp-muted:   #1f2937;      /* helper text */
               --crp-accent:  #d2a679;      /* clay/terra accent */
-              --crp-accent-2:#7db6d4;      /* cool secondary (slip/ash) */
+              --crp-accent-2:#1f2937;      /* cool secondary (slip/ash) */
             }
             @media (prefers-color-scheme: light){
               :root{
