@@ -4,69 +4,7 @@ import json
 
 st.set_page_config(page_title="Pottery Cost Analysis App", layout="wide")
 ss = st.session_state
-# ---------- Global theme + card CSS ----------
-def inject_theme_css():
-    st.markdown(
-        """
-        <style>
-            /* Light mode */
-            @media (prefers-color-scheme: light){
-              :root {
-                --crp-bg: #ffffff;   /* white background */
-                --crp-text: #000000; /* black text */
-              }
-            }
 
-            /* Dark mode */
-            @media (prefers-color-scheme: dark){
-              :root {
-                --crp-bg: #000000;   /* black background */
-                --crp-text: #ffffff; /* white text */
-              }
-            }
-
-            /* Apply everywhere */
-            .main, .stApp {
-              background: var(--crp-bg) !important;
-              color: var(--crp-text) !important;
-            }
-
-            h1, h2, h3, h4, h5, h6, p, span, label, div, .stMarkdown, .stSubheader {
-              color: var(--crp-text) !important;
-            }
-
-            /* Buttons */
-            .stButton>button {
-              background: var(--crp-text) !important;
-              color: var(--crp-bg) !important;
-              border-radius: 6px !important;
-              border: none !important;
-            }
-            .stButton>button:hover {
-              opacity: 0.8;
-            }
-
-            /* Expander, cards, inputs */
-            .st-expander, .stDataFrame, .stDataEditor {
-              background: var(--crp-bg) !important;
-              color: var(--crp-text) !important;
-              border: 1px solid var(--crp-text) !important;
-              border-radius: 6px !important;
-            }
-
-            input, textarea, select {
-              background: var(--crp-bg) !important;
-              color: var(--crp-text) !important;
-              border: 1px solid var(--crp-text) !important;
-            }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-inject_theme_css()
-# ---------- end CSS ----------
 
 
 # ------------ Helpers ------------
@@ -993,7 +931,7 @@ with tabs[0]:
             
 
         # ---------- Clay & packaging ----------
-        card_start()
+       
         st.subheader("Clay and packaging")
 
         ip["units_made"] = st.number_input(
