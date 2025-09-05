@@ -53,7 +53,7 @@ def inject_theme_css():
             .stButton>button{
               background: var(--crp-accent) !important;
               color: white !important; border: none !important;
-              border-radius: 10px !important;
+              border-radius: 5px !important;
             }
             .stButton>button:hover{ filter: brightness(0.95); }
 
@@ -63,7 +63,7 @@ def inject_theme_css():
             /* Expanders */
             .st-expander{
               background: var(--crp-card) !important;
-              border-radius: 12px !important;
+              border-radius: 5px !important;
               border: 1px solid rgba(255,255,255,.05);
             }
         </style>
