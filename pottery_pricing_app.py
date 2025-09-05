@@ -46,6 +46,66 @@ def other_materials_pp(df, pieces_in_project: int):
     df2["Cost_per_piece"] = df2["Line_total"] / max(1, int(pieces_in_project))
     return per_piece, project_total, df2
 
+# --- Form presets: loader + initializer --------------------------------------
+@st.cache_data(show_spinner=False)
+def load_default_presets() -> pd.DataFrame:
+    """
+    Loads presets from your GitHub RAW CSV.
+    Falls back to a built-in 'Sharon set' if the CSV can't be read.
+    Columns: Form, Clay_lb_wet, Default_glaze_g, Notes
+    """
+    cols = {"Form": "", "Clay_lb_wet": 0.0, "Default_glaze_g": 0.0, "Notes": ""}
+
+    # Try your repo first (RAW URL)
+    url = "https://raw.githubusercontent.com/creekroadpottery/pottery-pricing-app/main/form_presets.csv"
+    try:
+        df = pd.read_csv(url)
+        for c, d in cols.items():
+            if c not in df.columns:
+                df[c] = d
+        return df[list(cols.keys())]
+    except Exception:
+        pass
+
+    # Fallback: Sharon’s starter list (edit/expand anytime)
+    fallback = pd.DataFrame(
+        [
+            {"Form": "Mug (12 oz)",              "Clay_lb_wet": 0.90, "Default_glaze_g": 40,  "Notes": "straight"},
+            {"Form": "Mug (14 oz)",              "Clay_lb_wet": 1.00, "Default_glaze_g": 45,  "Notes": ""},
+            {"Form": "Creamer (small)",          "Clay_lb_wet": 0.75, "Default_glaze_g": 30,  "Notes": ""},
+            {"Form": "Pitcher (medium)",         "Clay_lb_wet": 2.50, "Default_glaze_g": 85,  "Notes": ""},
+            {"Form": "Bowl (cereal)",            "Clay_lb_wet": 1.25, "Default_glaze_g": 55,  "Notes": "≈6\""},
+            {"Form": "Bowl (small)",             "Clay_lb_wet": 1.00, "Default_glaze_g": 45,  "Notes": ""},
+            {"Form": "Bowl (medium)",            "Clay_lb_wet": 2.00, "Default_glaze_g": 80,  "Notes": ""},
+            {"Form": "Bowl (large)",             "Clay_lb_wet": 4.50, "Default_glaze_g": 140, "Notes": ""},
+            {"Form": "Plate (10 in dinner)",     "Clay_lb_wet": 2.50, "Default_glaze_g": 110, "Notes": ""},
+            {"Form": "Pie plate",                "Clay_lb_wet": 3.25, "Default_glaze_g": 120, "Notes": "3¼–3½ lb"},
+            {"Form": "Sugar jar",                "Clay_lb_wet": 1.00, "Default_glaze_g": 35,  "Notes": ""},
+            {"Form": "Honey jar",                "Clay_lb_wet": 1.25, "Default_glaze_g": 45,  "Notes": ""},
+            {"Form": "Crock (small)",            "Clay_lb_wet": 1.75, "Default_glaze_g": 60,  "Notes": ""},
+            {"Form": "Crock (medium)",           "Clay_lb_wet": 3.00, "Default_glaze_g": 95,  "Notes": ""},
+            {"Form": "Crock (large)",            "Clay_lb_wet": 4.00, "Default_glaze_g": 130, "Notes": ""},
+        ]
+    )
+    return fallback
+
+def init_form_presets_in_state():
+    """Ensure ss.form_presets_df exists and is normalized."""
+    if "form_presets_df" not in ss:
+        ss.form_presets_df = load_default_presets()
+
+    # Normalize + types
+    ss.form_presets_df = ss.form_presets_df.copy()
+    ss.form_presets_df["Form"] = ss.form_presets_df["Form"].astype(str).str.strip()
+    ss.form_presets_df["Clay_lb_wet"] = pd.to_numeric(ss.form_presets_df["Clay_lb_wet"], errors="coerce").fillna(0.0)
+    ss.form_presets_df["Default_glaze_g"] = pd.to_numeric(ss.form_presets_df["Default_glaze_g"], errors="coerce").fillna(0.0)
+    if "Notes" not in ss.form_presets_df.columns:
+        ss.form_presets_df["Notes"] = ""
+
+# Call init early in your script (after you define ss = st.session_state)
+init_form_presets_in_state()
+
+
 # ------------ Session defaults ------------
 if "shrink_rate_pct" not in ss:
     ss.shrink_rate_pct = 12.0   # typical stoneware range 10 to 15
