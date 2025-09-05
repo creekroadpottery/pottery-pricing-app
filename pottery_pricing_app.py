@@ -46,30 +46,19 @@ def other_materials_pp(df, pieces_in_project: int):
     df2["Cost_per_piece"] = df2["Line_total"] / max(1, int(pieces_in_project))
     return per_piece, project_total, df2
 
-# --- Form presets: loader + initializer --------------------------------------
-@st.cache_data(show_spinner=False)
-def load_default_presets() -> pd.DataFrame:
-    """
-    Loads presets from your GitHub RAW CSV.
-    Falls back to a built-in 'Sharon set' if the CSV can't be read.
-    Columns: Form, Clay_lb_wet, Default_glaze_g, Notes
-    """
-    cols = {"Form": "", "Clay_lb_wet": 0.0, "Default_glaze_g": 0.0, "Notes": ""}
-
-    # Try your repo first (RAW URL)
-    url = "https://raw.githubusercontent.com/creekroadpottery/pottery-pricing-app/main/form_presets.csv"
+# --- Form presets at startup ---
+if "form_presets_df" not in ss:
     try:
-        df = pd.read_csv(url)
-        for c, d in cols.items():
-            if c not in df.columns:
-                df[c] = d
-        return df[list(cols.keys())]
+        presets_url = "https://raw.githubusercontent.com/creekroadpottery/pottery-pricing-app/main/form_presets.csv"
+        df = pd.read_csv(presets_url)
+        df = ensure_cols(df, {"Form": "", "Clay_lb_wet": 0.0, "Default_glaze_g": 0.0, "Notes": ""})
+        # add Category if missing, then sort with mugs/bowls first
+        if "Category" not in df.columns:
+            df["Category"] = df["Form"].apply(infer_category)
+        ss.form_presets_df = sort_by_category_then_form(df)
     except Exception:
-        pass
-
-    # Fallback: Sharon’s starter list (edit/expand anytime)
-    fallback = pd.DataFrame(
-        [
+        fallback = pd.DataFrame(
+            [
             {"Form": "Mug (12 oz)",              "Clay_lb_wet": 0.90, "Default_glaze_g": 40,  "Notes": "straight"},
             {"Form": "Mug (14 oz)",              "Clay_lb_wet": 1.00, "Default_glaze_g": 45,  "Notes": ""},
             {"Form": "Creamer (small)",          "Clay_lb_wet": 0.75, "Default_glaze_g": 30,  "Notes": ""},
@@ -387,14 +376,17 @@ def load_default_presets() -> pd.DataFrame:
             
 
 
-        ]
+         )
+        fallback["Category"] = fallback["Form"].apply(infer_category)
+        ss.form_presets_df = sort_by_category_then_form(fallback)
+else:
+    # if it exists from a save, ensure Category and sort
+    df = ensure_cols(
+        ss.form_presets_df, {"Form": "", "Clay_lb_wet": 0.0, "Default_glaze_g": 0.0, "Notes": ""}
     )
-    return fallback
-
-def init_form_presets_in_state():
-    """Ensure ss.form_presets_df exists and is normalized."""
-    if "form_presets_df" not in ss:
-        ss.form_presets_df = load_default_presets()
+    if "Category" not in df.columns:
+        df["Category"] = df["Form"].apply(infer_category)
+    ss.form_presets_df = sort_by_category_then_form(df)
 
     # Normalize + types
     ss.form_presets_df = ss.form_presets_df.copy()
@@ -683,97 +675,48 @@ with tabs[0]:
     # Left column
     # =========================
     with left:
-        # ---------- Form preset picker + manager ----------
-        st.subheader("Form preset")
+        # --- Form preset (grouped) ---
+st.subheader("Form preset")
 
-        # Safe copy of presets table (created by init_form_presets_in_state)
-        presets_df = ss.form_presets_df.copy()
+preset_df = ensure_cols(
+    ss.get("form_presets_df", pd.DataFrame()),
+    {"Form": "", "Clay_lb_wet": 0.0, "Default_glaze_g": 0.0, "Notes": ""}
+)
+if "Category" not in preset_df.columns:
+    preset_df["Category"] = preset_df["Form"].apply(infer_category)
+preset_df = sort_by_category_then_form(preset_df)
 
-        # Dropdown of forms
-        forms = list(presets_df["Form"]) if not presets_df.empty else []
-        choice = st.selectbox("Choose a form", ["None"] + forms, index=0, key="form_choice")
+# Category dropdown with mugs and bowls at top
+cats = ["All"] + CATEGORY_ORDER + sorted(
+    [c for c in preset_df["Category"].unique() if c not in CATEGORY_ORDER]
+)
+sel_cat = st.selectbox("Category", cats, index=0, key="form_cat")
 
-        # Preview & apply
-        if choice != "None" and not presets_df.empty:
-            row = presets_df.loc[presets_df["Form"] == choice].iloc[0]
-            preset_clay_lb = float(row.get("Clay_lb_wet", 0.0))
-            preset_glaze_g = float(row.get("Default_glaze_g", 0.0))
-            note = str(row.get("Notes", "")).strip()
+if sel_cat != "All":
+    filtered = preset_df[preset_df["Category"] == sel_cat]
+else:
+    filtered = preset_df
 
-            c1, c2, c3 = st.columns([1, 1, 2])
-            c1.metric("Preset clay", f"{preset_clay_lb:.2f} lb")
-            c2.metric("Preset glaze", f"{preset_glaze_g:.0f} g")
-            if note:
-                c3.caption(note)
+options = ["None"] + list(filtered["Form"])
+sel_form = st.selectbox("Choose a form", options, index=0, key="form_choice")
 
-            if st.button("Use this preset", key="apply_preset_btn"):
-                ip["clay_weight_per_piece_lb"] = preset_clay_lb
-                ss.recipe_grams_per_piece = preset_glaze_g
-                st.success("Preset applied to clay weight and glaze grams per piece.")
+if sel_form != "None":
+    row = filtered.loc[filtered["Form"] == sel_form].iloc[0]
+    preset_clay_lb = float(row.get("Clay_lb_wet", 0.0))
+    preset_glaze_g = float(row.get("Default_glaze_g", 0.0))
+    note = str(row.get("Notes", "")).strip()
+    st.caption(f"Category: {row.get('Category','')}")
+    c1, c2, c3 = st.columns([1,1,2])
+    c1.metric("Preset clay", f"{preset_clay_lb:.2f} lb")
+    c2.metric("Preset glaze", f"{preset_glaze_g:.0f} g")
+    if note:
+        c3.caption(note)
 
-        # Manage presets
-        with st.expander("Manage presets (CSV import/export, inline edit)"):
-            st.caption("Columns must be: Form, Clay_lb_wet, Default_glaze_g, Notes")
-
-            # Export current presets
-            _csv_bytes = ss.form_presets_df.to_csv(index=False).encode("utf-8")
-            st.download_button(
-                "Download presets CSV",
-                _csv_bytes,
-                file_name="form_presets.csv",
-                mime="text/csv",
-                key="dl_presets_csv",
-            )
-
-            # Upload new presets
-            u1, u2 = st.columns([1, 1])
-            with u1:
-                upload_mode = st.radio(
-                    "When uploading",
-                    ["Replace", "Append"],
-                    horizontal=True,
-                    key="presets_upload_mode",
-                )
-            with u2:
-                up = st.file_uploader("Upload presets CSV", type=["csv"], key="presets_csv_uploader")
-
-            if up is not None:
-                try:
-                    new_df = pd.read_csv(up)
-                    # normalize
-                    for c in ["Form", "Clay_lb_wet", "Default_glaze_g", "Notes"]:
-                        if c not in new_df.columns:
-                            new_df[c] = "" if c in ("Form", "Notes") else 0.0
-                    new_df = new_df[["Form", "Clay_lb_wet", "Default_glaze_g", "Notes"]].copy()
-                    new_df["Form"] = new_df["Form"].astype(str).str.strip()
-                    new_df["Clay_lb_wet"] = pd.to_numeric(new_df["Clay_lb_wet"], errors="coerce").fillna(0.0)
-                    new_df["Default_glaze_g"] = pd.to_numeric(new_df["Default_glaze_g"], errors="coerce").fillna(0.0)
-
-                    if upload_mode == "Replace":
-                        ss.form_presets_df = new_df
-                    else:
-                        base = ss.form_presets_df.copy()
-                        combo = pd.concat([base, new_df], ignore_index=True)
-                        ss.form_presets_df = combo.drop_duplicates(subset=["Form"], keep="last").reset_index(drop=True)
-
-                    st.success(f"Loaded {len(new_df)} presets.")
-                except Exception as e:
-                    st.error(f"Could not read CSV. {e}")
-
-            st.caption("Edit rows below (add/delete allowed).")
-            edited = st.data_editor(
-                ss.form_presets_df,
-                column_config={
-                    "Form": st.column_config.TextColumn("Form"),
-                    "Clay_lb_wet": st.column_config.NumberColumn("Clay (lb, wet)", min_value=0.0, step=0.05),
-                    "Default_glaze_g": st.column_config.NumberColumn("Default glaze (g)", min_value=0.0, step=1.0),
-                    "Notes": st.column_config.TextColumn("Notes"),
-                },
-                num_rows="dynamic",
-                use_container_width=True,
-                key="form_presets_editor",
-            )
-            ss.form_presets_df = edited.copy()
+    # optional: apply button to copy the preset numbers into inputs
+    if st.button("Apply to clay and glaze", key="apply_preset_btn"):
+        ip["clay_weight_per_piece_lb"] = float(preset_clay_lb)
+        ss.recipe_grams_per_piece = float(preset_glaze_g)
+        st.toast("Preset applied")
 
         # ---------- Clay & packaging ----------
         st.subheader("Clay and packaging")
