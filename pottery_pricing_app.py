@@ -1,7 +1,7 @@
-
 import streamlit as st
 import pandas as pd
 import json
+import io
 
 st.set_page_config(page_title="Pottery Cost Analysis App", layout="wide")
 ss = st.session_state
@@ -35,6 +35,22 @@ def to_json_bytes(obj):
 def from_json_bytes(b):
     return json.loads(b.decode("utf-8"))
 
+def to_csv_bytes(df):
+    return df.to_csv(index=False).encode("utf-8")
+
+def from_csv_text(text, expected_cols):
+    """Parse CSV text with robust error handling"""
+    try:
+        df = pd.read_csv(io.StringIO(text))
+        # Ensure all expected columns exist
+        for col in expected_cols:
+            if col not in df.columns:
+                df[col] = expected_cols[col] if isinstance(expected_cols[col], (int, float)) else ""
+        return df[list(expected_cols.keys())]
+    except Exception as e:
+        st.error(f"Error reading CSV: {str(e)}")
+        return pd.DataFrame(columns=list(expected_cols.keys()))
+
 def other_materials_pp(df, pieces_in_project: int):
     df2 = ensure_cols(df, {
         "Item":"", "Unit":"", "Cost_per_unit":0.0, "Quantity_for_project":0.0
@@ -50,6 +66,13 @@ if "shrink_rate_pct" not in ss:
     ss.shrink_rate_pct = 12.0   # typical stoneware range 10 to 15
 if "shrink_units" not in ss:
     ss.shrink_units = "in"
+
+# Initialize shrink log for different clay bodies
+if "shrink_log" not in ss:
+    ss.shrink_log = pd.DataFrame([
+        {"Clay_Body": "Stoneware Generic", "Firing_Type": "Cone 10", "Shrink_Percent": 12.0},
+        {"Clay_Body": "Porcelain", "Firing_Type": "Cone 10", "Shrink_Percent": 14.0},
+    ])
 
 if "inputs" not in ss:
     ss.inputs = dict(
@@ -74,12 +97,25 @@ if "inputs" not in ss:
         pieces_per_wood_firing=40,
     )
 
+# Form library - preloaded clay weights for common forms
+if "form_library" not in ss:
+    ss.form_library = pd.DataFrame([
+        {"Form": "Mug 12oz", "Clay_Weight_lb": 1.2, "Description": "Standard coffee mug"},
+        {"Form": "Bowl 6in", "Clay_Weight_lb": 1.5, "Description": "Cereal/soup bowl"},
+        {"Form": "Plate 10in", "Clay_Weight_lb": 2.0, "Description": "Dinner plate"},
+        {"Form": "Vase 8in", "Clay_Weight_lb": 1.8, "Description": "Medium decorative vase"},
+        {"Form": "Tumbler 16oz", "Clay_Weight_lb": 1.0, "Description": "Large drinking glass"},
+        {"Form": "Teapot 24oz", "Clay_Weight_lb": 2.5, "Description": "2-3 cup teapot body only"},
+        {"Form": "Casserole 2qt", "Clay_Weight_lb": 3.5, "Description": "Covered baking dish"},
+        {"Form": "Pitcher 32oz", "Clay_Weight_lb": 2.2, "Description": "Water/milk pitcher"},
+    ])
+
 if "catalog_df" not in ss:
     ss.catalog_df = pd.DataFrame([
-        {"Material": "Custer Feldspar", "Cost_per_lb": 0.00},
-        {"Material": "Silica 325m",     "Cost_per_lb": 0.00},
-        {"Material": "EPK Kaolin",      "Cost_per_lb": 0.00},
-        {"Material": "Frit 3134",       "Cost_per_lb": 0.00},
+        {"Material": "Custer Feldspar", "Cost_per_lb": 0.00, "Cost_per_kg": 0.00},
+        {"Material": "Silica 325m",     "Cost_per_lb": 0.00, "Cost_per_kg": 0.00},
+        {"Material": "EPK Kaolin",      "Cost_per_lb": 0.00, "Cost_per_kg": 0.00},
+        {"Material": "Frit 3134",       "Cost_per_lb": 0.00, "Cost_per_kg": 0.00},
     ])
 
 if "recipe_df" not in ss:
@@ -214,6 +250,7 @@ def calc_totals(ip, glaze_per_piece_cost, other_pp: float = 0.0):
         other_pp=other_pp, energy_pp=energy_pp, labor_pp=labor_pp, oh_pp=overhead_pp,
         total_pp=total_pp, wholesale=wholesale, retail=retail, distributor=distributor
     )
+
 st.title("Pottery Cost Analysis App")
 
 tabs = st.tabs([
@@ -231,6 +268,38 @@ with tabs[0]:
         st.subheader("Clay and packaging")
 
         ip["units_made"] = st.number_input("Units in this batch", min_value=1, value=int(ip["units_made"]), step=1)
+        
+        # Form library selector
+        with st.expander("📋 Form Library - Quick Clay Weights"):
+            st.caption("Select a common form to auto-fill clay weight, or add your own forms to the library.")
+            
+            col1, col2 = st.columns([2, 1])
+            with col1:
+                form_options = ["Custom"] + ss.form_library["Form"].tolist()
+                selected_form = st.selectbox("Choose form type", form_options, index=0)
+            
+            if selected_form != "Custom":
+                form_row = ss.form_library[ss.form_library["Form"] == selected_form].iloc[0]
+                with col2:
+                    if st.button("Use this weight"):
+                        ip["clay_weight_per_piece_lb"] = float(form_row["Clay_Weight_lb"])
+                        st.success(f"Set to {form_row['Clay_Weight_lb']} lb")
+                st.caption(f"**{selected_form}**: {form_row['Clay_Weight_lb']} lb - {form_row['Description']}")
+            
+            # Edit form library
+            if st.checkbox("Edit form library"):
+                ss.form_library = st.data_editor(
+                    ss.form_library,
+                    column_config={
+                        "Form": st.column_config.TextColumn("Form Name"),
+                        "Clay_Weight_lb": st.column_config.NumberColumn("Clay Weight (lb)", min_value=0.0, step=0.1),
+                        "Description": st.column_config.TextColumn("Description"),
+                    },
+                    num_rows="dynamic",
+                    use_container_width=True,
+                    key="form_library_editor"
+                )
+
         ip["clay_price_per_bag"] = st.number_input("Clay price per bag", min_value=0.0, value=float(ip["clay_price_per_bag"]), step=0.5)
         ip["clay_bag_weight_lb"] = st.number_input("Clay bag weight lb", min_value=0.1, value=float(ip["clay_bag_weight_lb"]), step=0.1)
         ip["clay_weight_per_piece_lb"] = st.number_input("Clay weight per piece lb wet", min_value=0.0, value=float(ip["clay_weight_per_piece_lb"]), step=0.1)
@@ -319,20 +388,77 @@ with tabs[0]:
         st.metric("Other project materials", money(totals["other_pp"]))
         st.metric("Total cost per piece", money(totals["total_pp"]))
 
-with st.expander("Shrink rate helper"):
-    # current shrink setting
+# Shrink rate helper moved to expandable section
+with st.expander("🔧 Shrink Rate Calculator & Size Tools"):
+    st.subheader("Shrink Rate Settings")
+    
+    # Shrink log management
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        st.caption("**Saved shrink rates by clay body:**")
+        
+        # Display current shrink log
+        if not ss.shrink_log.empty:
+            display_log = ss.shrink_log.copy()
+            for idx, row in display_log.iterrows():
+                st.text(f"• {row['Clay_Body']} ({row['Firing_Type']}): {row['Shrink_Percent']:.1f}%")
+        
+        # Quick selector from saved rates
+        if not ss.shrink_log.empty:
+            clay_options = [f"{row['Clay_Body']} ({row['Firing_Type']})" for _, row in ss.shrink_log.iterrows()]
+            selected_clay = st.selectbox("Use saved shrink rate:", ["Custom"] + clay_options)
+            
+            if selected_clay != "Custom":
+                selected_idx = clay_options.index(selected_clay)
+                selected_rate = ss.shrink_log.iloc[selected_idx]["Shrink_Percent"]
+                if st.button("Apply this shrink rate"):
+                    ss.shrink_rate_pct = float(selected_rate)
+                    st.success(f"Applied {selected_rate:.1f}% shrink rate")
+    
+    with col2:
+        # Edit shrink log
+        if st.checkbox("Manage shrink log"):
+            ss.shrink_log = st.data_editor(
+                ss.shrink_log,
+                column_config={
+                    "Clay_Body": st.column_config.TextColumn("Clay Body"),
+                    "Firing_Type": st.column_config.TextColumn("Firing Type"),
+                    "Shrink_Percent": st.column_config.NumberColumn("Shrink %", min_value=0.0, max_value=30.0, step=0.1),
+                },
+                num_rows="dynamic",
+                use_container_width=True,
+                key="shrink_log_editor"
+            )
+
+    # Current shrink setting
     ss.shrink_rate_pct = st.number_input(
-        "Shrink percent",
+        "Current shrink percent",
         min_value=0.0, max_value=30.0,
         value=float(ss.shrink_rate_pct), step=0.1,
         help="Overall linear shrink from wet to fired. 12 means 12 percent."
     )
     rate = ss.shrink_rate_pct / 100.0
+    
+    # Save current rate to log
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        new_clay_body = st.text_input("Clay body name", value="New Clay")
+    with col2:
+        new_firing_type = st.text_input("Firing type", value="Cone 10")
+    with col3:
+        if st.button("Save current rate"):
+            new_row = pd.DataFrame([{
+                "Clay_Body": new_clay_body,
+                "Firing_Type": new_firing_type,
+                "Shrink_Percent": ss.shrink_rate_pct
+            }])
+            ss.shrink_log = pd.concat([ss.shrink_log, new_row], ignore_index=True)
+            st.success(f"Saved {ss.shrink_rate_pct:.1f}% for {new_clay_body}")
 
     st.divider()
 
     # compute from a quick test tile
-    st.markdown("**Compute from test tile**")
+    st.subheader("Compute from test tile")
     c1, c2, c3 = st.columns([1, 1, 1])
     wet_len = c1.number_input("Wet length", min_value=0.0, value=10.0, step=0.1)
     fired_len = c2.number_input("Fired length", min_value=0.0, value=8.8, step=0.1)
@@ -350,7 +476,7 @@ with st.expander("Shrink rate helper"):
     ss.shrink_units = st.radio("Units", ["in", "mm"], index=(0 if ss.shrink_units == "in" else 1), horizontal=True)
 
     # wet -> fired, fired -> wet
-    st.markdown("**Size converter**")
+    st.subheader("Size converter")
     sc1, sc2, sc3 = st.columns([1, 1, 1])
     wet_size = sc1.number_input(f"Wet size ({ss.shrink_units})", min_value=0.0, value=4.00, step=0.01)
     fired_size_target = sc2.number_input(f"Target fired size ({ss.shrink_units})", min_value=0.0, value=3.52, step=0.01)
@@ -364,7 +490,7 @@ with st.expander("Shrink rate helper"):
     st.divider()
 
     # lid remake helper
-    st.markdown("**Lid remake helper**")
+    st.subheader("Lid remake helper")
     st.caption("Measure the fired rim outside diameter on the pot. Choose a small clearance to keep the fit comfortable.")
     lc1, lc2, lc3 = st.columns([1, 1, 1])
 
@@ -520,6 +646,7 @@ with tabs[3]:
     st.subheader("Overhead")
     ip["overhead_per_month"] = st.number_input("Overhead per month", min_value=0.0, value=float(ip["overhead_per_month"]), step=10.0)
     ip["pieces_per_month"] = st.number_input("Pieces per month", min_value=1, value=int(ip["pieces_per_month"]), step=10)
+
 # ------------ Pricing ------------
 with tabs[4]:
     ip = ss.inputs
@@ -572,6 +699,8 @@ with tabs[4]:
 # ------------ Save and load ------------
 with tabs[5]:
     st.subheader("Save and load settings")
+    
+    # Create state object with all data
     state = dict(
         inputs=ss.inputs,
         glaze_piece_df=ensure_cols(ss.glaze_piece_df, {"Material": "", "Cost_per_lb": 0.0, "Grams_per_piece": 0.0}).to_dict(orient="list"),
@@ -579,31 +708,127 @@ with tabs[5]:
         recipe_df=ensure_cols(ss.recipe_df, {"Material": "", "Percent": 0.0}).to_dict(orient="list"),
         recipe_grams_per_piece=ss.recipe_grams_per_piece,
         other_mat_df=ensure_cols(ss.other_mat_df, {"Item":"", "Unit":"", "Cost_per_unit":0.0, "Quantity_for_project":0.0}).to_dict(orient="list"),
+        form_library=ss.form_library.to_dict(orient="list"),
+        shrink_log=ss.shrink_log.to_dict(orient="list"),
+        shrink_rate_pct=ss.shrink_rate_pct,
+        shrink_units=ss.shrink_units,
     )
-    st.download_button("Download settings JSON", to_json_bytes(state), file_name="pottery_pricing_settings.json")
-    up = st.file_uploader("Upload settings JSON", type=["json"])
-    if up is not None:
-        try:
-            data = from_json_bytes(up.read())
-            ss.inputs.update(data.get("inputs", {}))
+    
+    # Download options
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("**Complete Settings**")
+        st.download_button(
+            "📄 Download settings JSON", 
+            to_json_bytes(state), 
+            file_name="pottery_pricing_settings.json",
+            help="Save all your settings, forms, and data"
+        )
+    
+    with col2:
+        st.markdown("**Individual Tables**")
+        
+        # Form library CSV
+        st.download_button(
+            "📋 Form library CSV",
+            to_csv_bytes(ss.form_library),
+            file_name="pottery_form_library.csv",
+            help="Export just the form library"
+        )
+        
+        # Catalog CSV
+        st.download_button(
+            "🧪 Material catalog CSV",
+            to_csv_bytes(ss.catalog_df),
+            file_name="pottery_material_catalog.csv",
+            help="Export material costs"
+        )
+        
+        # Shrink log CSV
+        st.download_button(
+            "📐 Shrink log CSV",
+            to_csv_bytes(ss.shrink_log),
+            file_name="pottery_shrink_log.csv", 
+            help="Export shrink rates by clay body"
+        )
 
-            def dict_to_df(d, cols):
-                if not isinstance(d, dict) or not d:
-                    return pd.DataFrame(columns=cols)
-                df = pd.DataFrame(d)
-                for c in cols:
-                    if c not in df.columns:
-                        df[c] = []
-                return df[cols]
+    st.divider()
+    
+    # Load options
+    st.subheader("Load settings")
+    
+    # JSON upload
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("**Complete settings file**")
+        up = st.file_uploader("Upload settings JSON", type=["json"], key="json_upload")
+        if up is not None:
+            try:
+                data = from_json_bytes(up.read())
+                ss.inputs.update(data.get("inputs", {}))
 
-            ss.glaze_piece_df = dict_to_df(data.get("glaze_piece_df", {}), ["Material", "Cost_per_lb", "Grams_per_piece"])
-            ss.catalog_df = dict_to_df(data.get("catalog_df", {}), ["Material", "Cost_per_lb", "Cost_per_kg"])
-            ss.recipe_df = dict_to_df(data.get("recipe_df", {}), ["Material", "Percent"])
-            ss.other_mat_df = dict_to_df(data.get("other_mat_df", {}), ["Item","Unit","Cost_per_unit","Quantity_for_project"])
-            ss.recipe_grams_per_piece = float(data.get("recipe_grams_per_piece", ss.recipe_grams_per_piece))
-            st.success("Loaded")
-        except Exception as e:
-            st.error(f"Could not load. {e}")
+                def dict_to_df(d, cols):
+                    if not isinstance(d, dict) or not d:
+                        return pd.DataFrame(columns=cols)
+                    df = pd.DataFrame(d)
+                    for c in cols:
+                        if c not in df.columns:
+                            df[c] = []
+                    return df[cols]
+
+                ss.glaze_piece_df = dict_to_df(data.get("glaze_piece_df", {}), ["Material", "Cost_per_lb", "Grams_per_piece"])
+                ss.catalog_df = dict_to_df(data.get("catalog_df", {}), ["Material", "Cost_per_lb", "Cost_per_kg"])
+                ss.recipe_df = dict_to_df(data.get("recipe_df", {}), ["Material", "Percent"])
+                ss.other_mat_df = dict_to_df(data.get("other_mat_df", {}), ["Item","Unit","Cost_per_unit","Quantity_for_project"])
+                ss.form_library = dict_to_df(data.get("form_library", {}), ["Form", "Clay_Weight_lb", "Description"])
+                ss.shrink_log = dict_to_df(data.get("shrink_log", {}), ["Clay_Body", "Firing_Type", "Shrink_Percent"])
+                
+                ss.recipe_grams_per_piece = float(data.get("recipe_grams_per_piece", ss.recipe_grams_per_piece))
+                ss.shrink_rate_pct = float(data.get("shrink_rate_pct", ss.shrink_rate_pct))
+                ss.shrink_units = str(data.get("shrink_units", ss.shrink_units))
+                
+                st.success("✅ All settings loaded successfully!")
+            except Exception as e:
+                st.error(f"❌ Could not load settings: {e}")
+    
+    with col2:
+        st.markdown("**Individual CSV files**")
+        
+        # Form library CSV upload
+        form_csv = st.file_uploader("Upload form library CSV", type=["csv"], key="form_csv")
+        if form_csv is not None:
+            try:
+                csv_text = form_csv.read().decode("utf-8")
+                ss.form_library = from_csv_text(csv_text, {"Form": "", "Clay_Weight_lb": 0.0, "Description": ""})
+                st.success("✅ Form library loaded!")
+            except Exception as e:
+                st.error(f"❌ Error loading form library: {e}")
+        
+        # Catalog CSV upload  
+        catalog_csv = st.file_uploader("Upload material catalog CSV", type=["csv"], key="catalog_csv")
+        if catalog_csv is not None:
+            try:
+                csv_text = catalog_csv.read().decode("utf-8")
+                loaded_catalog = from_csv_text(csv_text, {"Material": "", "Cost_per_lb": 0.0})
+                # Add Cost_per_kg column if not present
+                if "Cost_per_kg" not in loaded_catalog.columns:
+                    loaded_catalog["Cost_per_kg"] = loaded_catalog["Cost_per_lb"] * 2.20462
+                ss.catalog_df = loaded_catalog
+                st.success("✅ Material catalog loaded!")
+            except Exception as e:
+                st.error(f"❌ Error loading catalog: {e}")
+        
+        # Shrink log CSV upload
+        shrink_csv = st.file_uploader("Upload shrink log CSV", type=["csv"], key="shrink_csv")
+        if shrink_csv is not None:
+            try:
+                csv_text = shrink_csv.read().decode("utf-8")
+                ss.shrink_log = from_csv_text(csv_text, {"Clay_Body": "", "Firing_Type": "", "Shrink_Percent": 0.0})
+                st.success("✅ Shrink log loaded!")
+            except Exception as e:
+                st.error(f"❌ Error loading shrink log: {e}")
 
 # ------------ Report ------------
 with tabs[6]:
@@ -613,57 +838,112 @@ with tabs[6]:
     other_pp, _, _ = other_materials_pp(ss.other_mat_df, int(ss.inputs["units_made"]))
     totals = calc_totals(ip, glaze_pp_from_recipe, other_pp)
 
+    # Add export functionality
+    col1, col2 = st.columns([3, 1])
+    
+    with col1:
+        st.subheader("Cost Analysis Report")
+    
+    with col2:
+        # Create report data for export
+        report_data = {
+            "Analysis_Date": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "Units_Made": int(ip["units_made"]),
+            "Clay_Cost_Per_Piece": totals["clay_pp"],
+            "Glaze_Cost_Per_Piece": totals["glaze_pp"],
+            "Packaging_Cost_Per_Piece": totals["pack_pp"],
+            "Other_Materials_Per_Piece": totals["other_pp"],
+            "Energy_Cost_Per_Piece": totals["energy_pp"],
+            "Labor_Cost_Per_Piece": totals["labor_pp"],
+            "Overhead_Per_Piece": totals["oh_pp"],
+            "Total_Cost_Per_Piece": totals["total_pp"],
+            "Wholesale_Price": totals["wholesale"],
+            "Retail_Price": totals["retail"],
+            "Distributor_Price": totals.get("distributor", "N/A"),
+        }
+        
+        report_df = pd.DataFrame([report_data])
+        
+        st.download_button(
+            "📊 Export Report CSV",
+            to_csv_bytes(report_df),
+            file_name=f"pottery_cost_report_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}.csv",
+            help="Download detailed cost breakdown"
+        )
+
     st.subheader("Per piece totals")
 
     r1 = st.columns(3)
-    r1[0].markdown("Clay " + money(totals["clay_pp"]))
-    r1[1].markdown("Glaze " + money(totals["glaze_pp"]))
-    r1[2].markdown("Packaging " + money(totals["pack_pp"]))
+    r1[0].markdown("**Clay** " + money(totals["clay_pp"]))
+    r1[1].markdown("**Glaze** " + money(totals["glaze_pp"]))
+    r1[2].markdown("**Packaging** " + money(totals["pack_pp"]))
 
     r2 = st.columns(3)
-    r2[0].markdown("Other materials " + money(totals["other_pp"]))
-    r2[1].markdown("Energy " + money(totals["energy_pp"]))
-    r2[2].markdown("Labor " + money(totals["labor_pp"]))
+    r2[0].markdown("**Other materials** " + money(totals["other_pp"]))
+    r2[1].markdown("**Energy** " + money(totals["energy_pp"]))
+    r2[2].markdown("**Labor** " + money(totals["labor_pp"]))
 
-    st.markdown("Overhead " + money(totals["oh_pp"]))
-    st.markdown("**Total cost** " + money(totals["total_pp"]))
+    st.markdown("**Overhead** " + money(totals["oh_pp"]))
+    st.markdown("### **Total cost** " + money(totals["total_pp"]))
 
-    st.subheader("Prices")
-    st.markdown("Wholesale " + money(totals["wholesale"]))
-    st.markdown("Retail " + money(totals["retail"]))
+    st.subheader("Suggested prices")
+    st.markdown("**Wholesale** " + money(totals["wholesale"]))
+    st.markdown("**Retail** " + money(totals["retail"]))
     if totals["distributor"] is not None:
-        st.markdown("Distributor " + money(totals["distributor"]))
+        st.markdown("**Distributor** " + money(totals["distributor"]))
 
+    # Additional context
+    st.subheader("Analysis details")
+    
     fuel = str(ip.get("fuel_gas", "None"))
     if fuel == "Propane":
-        st.caption(f"Fuel: Propane at {money(ip.get('lp_price_per_gal',0.0))} per gallon")
+        st.caption(f"🔥 Fuel: Propane at {money(ip.get('lp_price_per_gal',0.0))} per gallon")
     elif fuel == "Natural Gas":
-        st.caption(f"Fuel: Natural Gas at {money(ip.get('ng_price_per_therm',0.0))} per therm")
+        st.caption(f"🔥 Fuel: Natural Gas at {money(ip.get('ng_price_per_therm',0.0))} per therm")
     elif fuel == "Wood":
-        st.caption(f"Fuel: Wood at {money(ip.get('wood_price_per_cord',0.0))} per cord "
+        st.caption(f"🔥 Fuel: Wood at {money(ip.get('wood_price_per_cord',0.0))} per cord "
                    f"and {money(ip.get('wood_price_per_facecord',0.0))} per face cord")
     else:
-        st.caption("Fuel: None (only electric firing costs included)")
+        st.caption("⚡ Fuel: Electric only (no fuel costs included)")
 
-    st.caption("Glaze costs calculated from Catalog cost per lb/kg and recipe percents.")
+    st.caption(f"🧪 Glaze costs calculated from catalog materials and recipe percentages ({ss.recipe_grams_per_piece:.1f}g per piece)")
+    st.caption(f"📐 Clay shrink rate: {ss.shrink_rate_pct:.1f}% • Clay yield after trimming: {ip['clay_yield']*100:.0f}%")
+    st.caption(f"⏱️ Labor: {ip['hours_per_piece']:.2f} hours @ {money(ip['labor_rate'])}/hour")
 
 # ------------ About ------------
 with tabs[7]:
     st.subheader("About this app")
     st.markdown("""
-This app was created to help potters understand the true cost of their work.
-It began as a simple spreadsheet and grew into something I wanted to share.
-
-The project is guided by gratitude, generosity, and empathy.
-Gratitude for the teachers, friends, and makers who showed me the way.
-Generosity in making the tool free for anyone who might find it useful.
-Empathy for the many potters balancing time, resources, and creativity.
-
-Your numbers stay private while the app runs in your browser.
-When you save settings, a small JSON file is downloaded to your computer.
-No data is sent anywhere else.
-
-Alford Wayman
-Artist and owner
-Creek Road Pottery LLC
-""")
+    This pottery cost analysis app was created to help potters understand the true cost of their work and price their pieces appropriately.
+    
+    **What this app does:**
+    - Calculates material costs (clay, glaze, other supplies)
+    - Accounts for energy costs (electric, gas, or wood firing)
+    - Includes labor and overhead expenses
+    - Suggests wholesale and retail pricing
+    - Provides shrink rate calculators and size conversion tools
+    - Stores your material catalogs and form libraries
+    
+    **New features in this version:**
+    - 📋 Form library with preset clay weights for common pieces
+    - 📐 Shrink rate log to save different clay body shrinkage rates
+    - 📊 Export reports and individual data tables as CSV files
+    - 🔧 Organized shrink rate tools in expandable section
+    - 💾 Improved save/load with better CSV handling
+    
+    **Your privacy:**
+    All calculations run in your browser. Your data stays private and is never sent to external servers. When you save settings, a file downloads directly to your computer.
+    
+    ---
+    
+    This project is guided by **gratitude**, **generosity**, and **empathy**.
+    
+    - **Gratitude** for the teachers, friends, and makers who showed me the way
+    - **Generosity** in making this tool free for anyone who might find it useful  
+    - **Empathy** for the many potters balancing time, resources, and creativity
+    
+    *Alford Wayman*  
+    *Artist and owner*  
+    *Creek Road Pottery LLC*
+    
+    
