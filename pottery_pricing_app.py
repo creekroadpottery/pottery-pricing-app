@@ -8,6 +8,83 @@ import json
 st.set_page_config(page_title="Pottery Cost Analysis App", layout="wide")
 ss = st.session_state
 
+# ---------- Global theme + card CSS ----------
+def inject_theme_css():
+    st.markdown(
+        """
+        <style>
+            :root{
+              --crp-bg:      #0e1117;      /* app background (dark) */
+              --crp-card:    #11151c;      /* card background */
+              --crp-text:    #e6eef8;      /* base text */
+              --crp-muted:   #aab6c4;      /* helper text */
+              --crp-accent:  #d2a679;      /* clay/terra accent */
+              --crp-accent-2:#7db6d4;      /* cool secondary (slip/ash) */
+            }
+            @media (prefers-color-scheme: light){
+              :root{
+                --crp-bg:      #f7f7f9;
+                --crp-card:    #ffffff;
+                --crp-text:    #1f2937;
+                --crp-muted:   #6b7280;
+                --crp-accent:  #a06a2f;
+                --crp-accent-2:#2f6ea0;
+              }
+            }
+
+            /* App background and text */
+            .main, .stApp { background: var(--crp-bg) !important; color: var(--crp-text); }
+
+            /* Headings */
+            .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 { color: var(--crp-text) !important; }
+            .stMarkdown p, .stMarkdown small, .stCaption, .st-emotion-cache-10trblm { color: var(--crp-muted) !important; }
+
+            /* Card */
+            .crp-card{
+              background: var(--crp-card);
+              border-radius: 14px;
+              box-shadow: 0 8px 24px rgba(0,0,0,.25);
+              padding: 16px 18px;
+              margin: 14px 0 18px 0;
+              border: 1px solid rgba(255,255,255,.05);
+            }
+            .crp-card h2, .crp-card h3{ margin-top: 0; }
+
+            /* Data editor / dataframe rounding */
+            .stDataFrame, .stDataEditor { border-radius: 12px; overflow: hidden; }
+
+            /* Buttons, radios, sliders tint */
+            .stButton>button{
+              background: var(--crp-accent) !important;
+              color: white !important; border: none !important;
+              border-radius: 10px !important;
+            }
+            .stButton>button:hover{ filter: brightness(0.95); }
+
+            .stSlider [data-baseweb="slider"] { color: var(--crp-accent) !important; }
+            .stRadio [data-baseweb="radio"] label { color: var(--crp-text) !important; }
+
+            /* Expanders */
+            .st-expander{
+              background: var(--crp-card) !important;
+              border-radius: 12px !important;
+              border: 1px solid rgba(255,255,255,.05);
+            }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+def card_start():
+    st.markdown('<div class="crp-card">', unsafe_allow_html=True)
+
+def card_end():
+    st.markdown('</div>', unsafe_allow_html=True)
+
+inject_theme_css()
+# ---------- end CSS ----------
+
+
 # ------------ Helpers ------------
 def ensure_cols(df, schema: dict):
     if df is None:
@@ -837,6 +914,7 @@ with tabs[0]:
     # =========================
     with left:
         # ---------- Form preset picker + manager ----------
+        card_start()
         st.subheader("Form preset")
 
         # Safe copy of presets table (created by init_form_presets_in_state)
@@ -927,8 +1005,10 @@ with tabs[0]:
                 key="form_presets_editor",
             )
             ss.form_presets_df = edited.copy()
+            card_end()
 
         # ---------- Clay & packaging ----------
+        card_start()
         st.subheader("Clay and packaging")
 
         ip["units_made"] = st.number_input(
@@ -963,8 +1043,10 @@ with tabs[0]:
         ip["packaging_per_piece"] = st.number_input(
             "Packaging per piece", min_value=0.0, value=float(ip["packaging_per_piece"]), step=0.1
         )
+         card_end()
 
         # --- Shrink tools in one dropdown only on this tab ---
+        card_start()
         with st.expander("Shrink rate helper", expanded=False):
             # compute shrink from a test tile
             st.markdown("**Compute from test tile**")
@@ -1053,8 +1135,10 @@ with tabs[0]:
             )
             expected_fired_id = lid_wet_id * (1.0 - rate)
             st.write(f"Expected fired gallery inner diameter: **{expected_fired_id:.3f} {u}**")
+            card_end()
 
         # ---------- Glaze source ----------
+        card_start()
         st.subheader("Glaze source")
         glaze_source = st.radio(
             "Glaze cost comes from",
@@ -1089,12 +1173,14 @@ with tabs[0]:
         if "Cost_per_piece" in _show_df.columns:
             _show_df["Cost_per_piece"] = _show_df["Cost_per_piece"].map(money)
         st.dataframe(_show_df, use_container_width=True)
+        card_end()
 
     # =========================
     # Right column
     # =========================
     with right:
         # Other project materials (one-time items per project)
+        card_start()
         st.subheader("Other project materials")
         st.caption("Add one-time items for this batch. The cost is divided by the number of pieces in the batch.")
 
@@ -1126,8 +1212,10 @@ with tabs[0]:
         project_total = float(ss.other_mat_df["Line_total"].sum()) if "Line_total" in ss.other_mat_df else 0.0
         other_pp = project_total / pieces
         st.caption(f"Project total {money(project_total)} • Adds {money(other_pp)} per piece")
+        card_end()
 
         # Totals
+        card_start()
         st.subheader("Per piece totals")
         totals = calc_totals(ip, glaze_pp_cost, other_pp)
 
@@ -1137,12 +1225,14 @@ with tabs[0]:
         c[2].metric("Overhead", money(totals["oh_pp"]))
         st.metric("Other project materials", money(totals["other_pp"]))
         st.metric("Total cost per piece", money(totals["total_pp"]))
+        card_end()
 
 
 
 
 # ------------ Glaze recipe ------------
 with tabs[1]:
+    card_start()
     st.subheader("Catalog (choose cost unit)")
     if "catalog_unit" not in ss:
         ss.catalog_unit = "lb"
@@ -1220,6 +1310,7 @@ with tabs[1]:
         st.warning("Please enter a number")
 
     st.metric("Glaze cost per piece from this recipe", money(cpg * ss.recipe_grams_per_piece))
+    card_end()
 
 # ------------ Energy ------------
 with tabs[2]:
@@ -1227,14 +1318,17 @@ with tabs[2]:
     col1, col2 = st.columns(2)
 
     with col1:
+        card_start()
         st.subheader("Electric")
         ip["kwh_rate"] = st.number_input("Rate per kWh", min_value=0.0, value=float(ip.get("kwh_rate", 0.0)), step=0.01)
         ip["kwh_bisque"] = st.number_input("kWh per bisque", min_value=0.0, value=float(ip.get("kwh_bisque", 0.0)), step=1.0)
         ip["kwh_glaze"]  = st.number_input("kWh per glaze",  min_value=0.0, value=float(ip.get("kwh_glaze", 0.0)),  step=1.0)
         ip["kwh_third"]  = st.number_input("kWh per third firing", min_value=0.0, value=float(ip.get("kwh_third", 0.0)), step=1.0)
         ip["pieces_per_electric_firing"] = st.number_input("Pieces per electric firing", min_value=1, value=int(ip.get("pieces_per_electric_firing", 40)), step=1)
+        card_end()
 
     with col2:
+        card_start()
         st.subheader("Fuel")
         ip["fuel_gas"] = st.selectbox("Fuel source", ["None", "Propane", "Natural Gas", "Wood"],
                                       index=["None","Propane","Natural Gas","Wood"].index(str(ip.get("fuel_gas","None"))))
@@ -1270,10 +1364,12 @@ with tabs[2]:
 
     st.subheader("Per piece energy now")
     st.metric("Energy per piece", money(calc_energy(ip)))
+    card_end()
 
 # ------------ Labor and overhead ------------
 with tabs[3]:
     ip = ss.inputs
+    card_start()
     st.subheader("Labor")
     ip["labor_rate"] = st.number_input("Labor rate per hour", min_value=0.0, value=float(ip["labor_rate"]), step=1.0)
     ip["hours_per_piece"] = st.number_input("Hours per piece", min_value=0.0, value=float(ip["hours_per_piece"]), step=0.05)
@@ -1281,9 +1377,11 @@ with tabs[3]:
     st.subheader("Overhead")
     ip["overhead_per_month"] = st.number_input("Overhead per month", min_value=0.0, value=float(ip["overhead_per_month"]), step=10.0)
     ip["pieces_per_month"] = st.number_input("Pieces per month", min_value=1, value=int(ip["pieces_per_month"]), step=10)
+    card_end()
 # ------------ Pricing ------------
 with tabs[4]:
     ip = ss.inputs
+    card_start()
 
     st.subheader("Pricing options")
     ip["use_2x2x2"] = st.checkbox("Use 2x2x2 rule", value=ip.get("use_2x2x2", False))
@@ -1329,9 +1427,11 @@ with tabs[4]:
 
     st.metric("Overhead", money(totals["oh_pp"]))
     st.metric("Total cost per piece", money(totals["total_pp"]))
+    card_end()
 
 # ------------ Save and load ------------
 with tabs[5]:
+    card_start()
     st.subheader("Save and load settings")
     state = dict(
         inputs=ss.inputs,
@@ -1365,6 +1465,9 @@ with tabs[5]:
             st.success("Loaded")
         except Exception as e:
             st.error(f"Could not load. {e}")
+
+        card_end()
+         
 
 # ------------ Report ------------
 with tabs[6]:
@@ -1410,6 +1513,7 @@ with tabs[6]:
 
 # ------------ About ------------
 with tabs[7]:
+    card_start()
     st.subheader("About this app")
     st.markdown("""
 This app was created to help potters understand the true cost of their work.
@@ -1428,3 +1532,4 @@ Alford Wayman
 Artist and owner
 Creek Road Pottery LLC
 """)
+    card_end()
