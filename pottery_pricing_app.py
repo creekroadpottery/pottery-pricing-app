@@ -4,6 +4,82 @@ import json
 
 st.set_page_config(page_title="Pottery Cost Analysis App", layout="wide")
 ss = st.session_state
+# ---------- Global theme + card CSS ----------
+def inject_theme_css():
+    st.markdown(
+        """
+        <style>
+            :root{
+              --crp-bg:      #0e1117;      /* app background (dark) */
+              --crp-card:    #11151c;      /* card background */
+              --crp-text:    #e6eef8;      /* base text */
+              --crp-muted:   #aab6c4;      /* helper text */
+              --crp-accent:  #d2a679;      /* clay/terra accent */
+              --crp-accent-2:#7db6d4;      /* cool secondary (slip/ash) */
+            }
+            @media (prefers-color-scheme: light){
+              :root{
+                --crp-bg:      #f7f7f9;
+                --crp-card:    #ffffff;
+                --crp-text:    #1f2937;
+                --crp-muted:   #6b7280;
+                --crp-accent:  #a06a2f;
+                --crp-accent-2:#2f6ea0;
+              }
+            }
+
+            /* App background and text */
+            .main, .stApp { background: var(--crp-bg) !important; color: var(--crp-text); }
+
+            /* Headings */
+            .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 { color: var(--crp-text) !important; }
+            .stMarkdown p, .stMarkdown small, .stCaption, .st-emotion-cache-10trblm { color: var(--crp-muted) !important; }
+
+            /* Card */
+            .crp-card{
+              background: var(--crp-card);
+              border-radius: 14px;
+              box-shadow: 0 8px 24px rgba(0,0,0,.25);
+              padding: 16px 18px;
+              margin: 14px 0 18px 0;
+              border: 1px solid rgba(255,255,255,.05);
+            }
+            .crp-card h2, .crp-card h3{ margin-top: 0; }
+
+            /* Data editor / dataframe rounding */
+            .stDataFrame, .stDataEditor { border-radius: 12px; overflow: hidden; }
+
+            /* Buttons, radios, sliders tint */
+            .stButton>button{
+              background: var(--crp-accent) !important;
+              color: white !important; border: none !important;
+              border-radius: 10px !important;
+            }
+            .stButton>button:hover{ filter: brightness(0.95); }
+
+            .stSlider [data-baseweb="slider"] { color: var(--crp-accent) !important; }
+            .stRadio [data-baseweb="radio"] label { color: var(--crp-text) !important; }
+
+            /* Expanders */
+            .st-expander{
+              background: var(--crp-card) !important;
+              border-radius: 12px !important;
+              border: 1px solid rgba(255,255,255,.05);
+            }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+def card_start():
+    st.markdown('<div class="crp-card">', unsafe_allow_html=True)
+
+def card_end():
+    st.markdown('</div>', unsafe_allow_html=True)
+
+inject_theme_css()
+# ---------- end CSS ----------
+
 
 # ------------ Helpers ------------
 def ensure_cols(df, schema: dict):
