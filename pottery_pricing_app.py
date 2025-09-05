@@ -1103,7 +1103,7 @@ with tabs[0]:
     # =========================
     with right:
         # Other project materials (one-time items per project)
-        card_start()
+        
         st.subheader("Other project materials")
         st.caption("Add one-time items for this batch. The cost is divided by the number of pieces in the batch.")
 
