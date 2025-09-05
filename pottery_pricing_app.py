@@ -384,7 +384,8 @@ def load_default_presets() -> pd.DataFrame:
             {"Form": "Divided dish",                "Clay_lb_wet": 3.50, "Default_glaze_g": 140, "Notes": ""},
             {"Form": "Butter dish (tray)",          "Clay_lb_wet": 1.50, "Default_glaze_g": 60,  "Notes": ""},
             {"Form": "Butter dish (covered)",       "Clay_lb_wet": 2.50, "Default_glaze_g": 100, "Notes": "with lid"},
-]
+            
+
 
         ]
     )
