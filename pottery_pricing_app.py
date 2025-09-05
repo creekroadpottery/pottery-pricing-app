@@ -9,73 +9,61 @@ def inject_theme_css():
     st.markdown(
         """
         <style>
-            :root{
-              --crp-bg:      #0e1117;      /* app background (dark) */
-              --crp-card:    #11151c;      /* card background */
-              --crp-text:    #1f2937;      /* base text */
-              --crp-muted:   #1f2937;      /* helper text */
-              --crp-accent:  #1f2937;      /* clay/terra accent */
-              --crp-accent-2:#1f2937;      /* cool secondary (slip/ash) */
-            }
+            /* Light mode */
             @media (prefers-color-scheme: light){
-              :root{
-                --crp-bg:      #f7f7f9;
-                --crp-card:    #ffffff;
-                --crp-text:    #1f2937;
-                --crp-muted:   #1f2937;
-                --crp-accent:  #1f2937;
-                --crp-accent-2:#1f2937;
+              :root {
+                --crp-bg: #ffffff;   /* white background */
+                --crp-text: #000000; /* black text */
               }
             }
 
-            /* App background and text */
-            .main, .stApp { background: var(--crp-bg) !important; color: var(--crp-text); }
-
-            /* Headings */
-            .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 { color: var(--crp-text) !important; }
-            .stMarkdown p, .stMarkdown small, .stCaption, .st-emotion-cache-10trblm { color: var(--crp-muted) !important; }
-
-            /* Card */
-            .crp-card{
-              background: var(--crp-card);
-              border-radius: 7px;
-              box-shadow: 0 4px 12px rgba(0,0,0,.25);
-              padding: 8px 9px;
-              margin: 7px 0 9px 0;
-              border: 1px solid rgba(255,255,255,.05);
+            /* Dark mode */
+            @media (prefers-color-scheme: dark){
+              :root {
+                --crp-bg: #000000;   /* black background */
+                --crp-text: #ffffff; /* white text */
+              }
             }
-            .crp-card h2, .crp-card h3{ margin-top: 0; }
 
-            /* Data editor / dataframe rounding */
-            .stDataFrame, .stDataEditor { border-radius: 12px; overflow: hidden; }
-
-            /* Buttons, radios, sliders tint */
-            .stButton>button{
-              background: var(--crp-accent) !important;
-              color: white !important; border: none !important;
-              border-radius: 5px !important;
+            /* Apply everywhere */
+            .main, .stApp {
+              background: var(--crp-bg) !important;
+              color: var(--crp-text) !important;
             }
-            .stButton>button:hover{ filter: brightness(0.95); }
 
-            .stSlider [data-baseweb="slider"] { color: var(--crp-accent) !important; }
-            .stRadio [data-baseweb="radio"] label { color: var(--crp-text) !important; }
+            h1, h2, h3, h4, h5, h6, p, span, label, div, .stMarkdown, .stSubheader {
+              color: var(--crp-text) !important;
+            }
 
-            /* Expanders */
-            .st-expander{
-              background: var(--crp-card) !important;
-              border-radius: 5px !important;
-              border: 1px solid rgba(255,255,255,.05);
+            /* Buttons */
+            .stButton>button {
+              background: var(--crp-text) !important;
+              color: var(--crp-bg) !important;
+              border-radius: 6px !important;
+              border: none !important;
+            }
+            .stButton>button:hover {
+              opacity: 0.8;
+            }
+
+            /* Expander, cards, inputs */
+            .st-expander, .stDataFrame, .stDataEditor {
+              background: var(--crp-bg) !important;
+              color: var(--crp-text) !important;
+              border: 1px solid var(--crp-text) !important;
+              border-radius: 6px !important;
+            }
+
+            input, textarea, select {
+              background: var(--crp-bg) !important;
+              color: var(--crp-text) !important;
+              border: 1px solid var(--crp-text) !important;
             }
         </style>
         """,
         unsafe_allow_html=True,
     )
 
-def card_start():
-    st.markdown('<div class="crp-card">', unsafe_allow_html=True)
-
-def card_end():
-    st.markdown('</div>', unsafe_allow_html=True)
 
 inject_theme_css()
 # ---------- end CSS ----------
