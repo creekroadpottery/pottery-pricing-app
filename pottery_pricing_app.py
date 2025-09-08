@@ -692,7 +692,7 @@ if "inputs" not in ss:
         clay_yield=0.9,
         packaging_per_piece=0.0,
         kwh_rate=0.15, kwh_bisque=30.0, kwh_glaze=35.0, kwh_third=0.0, pieces_per_electric_firing=40,
-        labor_rate=25.0, hours_per_piece=0.25,
+        labor_rate=15.0, hours_per_piece=0.25,
         overhead_per_month=500.0, pieces_per_month=200,
         use_2x2x2=False, wholesale_margin_pct=50, retail_multiplier=2.2,
         # fuel defaults
