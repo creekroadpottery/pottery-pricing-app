@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 import json
+import datetime as _dt
+
 
 st.set_page_config(page_title="Pottery Cost Analysis App", layout="wide")
 ss = st.session_state
@@ -45,6 +47,34 @@ def other_materials_pp(df, pieces_in_project: int):
     per_piece = project_total / max(1, int(pieces_in_project))
     df2["Cost_per_piece"] = df2["Line_total"] / max(1, int(pieces_in_project))
     return per_piece, project_total, df2
+# ---- Tariff rates loader (local JSON or URL) ----
+@st.cache_data
+def load_tariff_table(local_path: str = "tariff_rates.json", url: str = "") -> pd.DataFrame:
+    df = pd.DataFrame(columns=["HS_code", "Description", "Country", "Duty_rate", "VAT_rate"])
+    # try local first
+    try:
+        df = pd.read_json(local_path)
+    except Exception:
+        pass
+    # optional URL override
+    if url:
+        try:
+            df = pd.read_json(url)
+        except Exception:
+            pass
+    # normalize columns
+    for col in ["HS_code", "Description", "Country"]:
+        if col not in df.columns:
+            df[col] = ""
+    for col in ["Duty_rate", "VAT_rate"]:
+        if col not in df.columns:
+            df[col] = 0.0
+        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
+    # clean
+    df["HS_code"] = df["HS_code"].astype(str).str.strip()
+    df["Country"] = df["Country"].astype(str).str.strip()
+    return df[["HS_code", "Description", "Country", "Duty_rate", "VAT_rate"]]
+
 
 # --- Form presets: loader + initializer --------------------------------------
 @st.cache_data(show_spinner=False)
@@ -821,10 +851,20 @@ def calc_totals(ip, glaze_per_piece_cost, other_pp: float = 0.0):
     )
 st.title("Pottery Cost Analysis App")
 
-tabs = st.tabs([
-    "Per unit", "Glaze recipe", "Energy", "Labor and overhead",
-    "Pricing", "Save and load", "Report", "About"
-])
+tab_titles = [
+    "Per Unit",
+    "Glaze Recipe",
+    "Energy",
+    "Labor and Overhead",
+    "Pricing",
+    "Save and Load",
+    "Shipping & Tariffs",   # <— new tab
+    "Report",
+    "About",
+]
+tabs = st.tabs(tab_titles)
+
+
 
 # ------------- Per unit -------------
 with tabs[0]:
@@ -1306,7 +1346,7 @@ with tabs[4]:
     ip = ss.inputs
     
 
-    st.subheader("Pricing options")
+    st.subheader("Pricing Options")
     ip["use_2x2x2"] = st.checkbox("Use 2x2x2 rule", value=ip.get("use_2x2x2", False))
 
     if not ip["use_2x2x2"]:
@@ -1350,6 +1390,184 @@ with tabs[4]:
 
     st.metric("Overhead", money(totals["oh_pp"]))
     st.metric("Total cost per piece", money(totals["total_pp"]))
+
+
+
+# ---------------- Shipping & Tariffs (functionalized) ----------------
+with tabs[tab_titles.index("Shipping & Tariffs")]:
+    import math
+
+    # ---------- helpers ----------
+    def _money(v: float) -> str:
+        # use your global money() if it exists, else local fallback
+        try:
+            return money(v)  # type: ignore[name-defined]
+        except Exception:
+            try:
+                return f"${float(v):,.2f}"
+            except Exception:
+                return "$0.00"
+
+    def _calc_dim_weight(l_in: float, w_in: float, h_in: float, divisor: int = 139) -> float:
+        """Air dimensional weight (lb)."""
+        if l_in <= 0 or w_in <= 0 or h_in <= 0:
+            return 0.0
+        return (l_in * w_in * h_in) / divisor
+
+    def render_summary_band():
+        """Top 4 metrics; returns the metric columns so downstream can update them."""
+        sum_c1, sum_c2, sum_c3, sum_c4 = st.columns([1, 1, 1, 1])
+        sum_c1.metric("Package weight", "—")
+        sum_c2.metric("Ship cost", "$0.00")
+        sum_c3.metric("Tariffs/VAT", "$0.00")
+        sum_c4.metric("Landed total", "$0.00")
+        return sum_c1, sum_c2, sum_c3, sum_c4
+
+    def render_domestic(sum_cols):
+        """Domestic shipping estimator and metric updater."""
+        sum_c1, sum_c2, sum_c3, sum_c4 = sum_cols
+
+        st.subheader("Domestic shipping (U.S.)")
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            pkg_weight_lb = st.number_input("Actual weight (lb)", min_value=0.0, step=0.1, value=3.0, key="dom_w")
+            zone = st.selectbox("Zone", ["Local", "Zone 2–4", "Zone 5–8"], index=1, key="dom_zone")
+        with c2:
+            speed = st.selectbox("Service speed", ["Ground", "2-Day", "Overnight"], index=0, key="dom_speed")
+            insurance = st.number_input("Insurance (declared value $)", min_value=0.0, step=10.0, value=0.0, key="dom_ins")
+        with c3:
+            handling = st.number_input("Packing/handling time (mins)", min_value=0, step=5, value=10, key="dom_handling")
+            labor_rate = st.number_input("Shop labor $/hr", min_value=0.0, step=1.0, value=20.0, key="dom_rate")
+
+        dim_wt = 0.0
+        with st.expander("Box size & dimensional weight (optional)"):
+            b1, b2, b3, b4 = st.columns(4)
+            with b1: L = st.number_input("Length (in)", min_value=0.0, step=0.1, value=12.0, key="dom_L")
+            with b2: W = st.number_input("Width (in)",  min_value=0.0, step=0.1, value=10.0, key="dom_W")
+            with b3: H = st.number_input("Height (in)", min_value=0.0, step=0.1, value=8.0,  key="dom_H")
+            with b4: dim_div = st.number_input("Dim divisor", min_value=100, step=1, value=139, key="dom_div")
+            dim_wt = _calc_dim_weight(L, W, H, dim_div)
+            st.caption(f"Dimensional weight ≈ **{dim_wt:.2f} lb** (billable uses max of actual vs dim).")
+
+        billable_lb = max(pkg_weight_lb, dim_wt)
+
+        # very simple base rate model (tweak to your table)
+        zone_factor = {"Local": 0.9, "Zone 2–4": 1.0, "Zone 5–8": 1.25}[zone]
+        speed_factor = {"Ground": 1.0, "2-Day": 1.9, "Overnight": 3.2}[speed]
+        base = 8.00 + (billable_lb * 1.10)  # base + per-lb
+        ship_cost = base * zone_factor * speed_factor
+
+        # insurance & surcharges
+        insurance_fee = 0.0 if insurance <= 0 else max(2.0, 0.01 * insurance)
+        fuel_surcharge = 0.09 * ship_cost
+        residential_fee = st.checkbox("Residential delivery", value=True, key="dom_res")
+        residential = 4.25 if residential_fee else 0.0
+        signature = st.checkbox("Signature required", value=False, key="dom_sig")
+        signature_fee = 3.75 if signature else 0.0
+
+        handling_cost = (handling / 60.0) * labor_rate
+
+        domestic_total = ship_cost + fuel_surcharge + insurance_fee + residential + signature_fee + handling_cost
+
+        # Breakdown
+        st.markdown("**Breakdown**")
+        st.write(
+            f"- Billable weight: **{billable_lb:.2f} lb**  "
+            f"\n- Base ship: {_money(ship_cost)}  "
+            f"\n- Fuel (est.): {_money(fuel_surcharge)}  "
+            f"\n- Insurance: {_money(insurance_fee)}  "
+            f"\n- Residential: {_money(residential)}  "
+            f"\n- Signature: {_money(signature_fee)}  "
+            f"\n- Handling: {_money(handling_cost)}"
+        )
+        st.success(f"Estimated domestic ship cost: **{_money(domestic_total)}**")
+
+        # update summary band
+        sum_c1.metric("Package weight", f"{billable_lb:.2f} lb")
+        sum_c2.metric("Ship cost", _money(domestic_total))
+        sum_c3.metric("Tariffs/VAT", _money(0.0))
+        sum_c4.metric("Landed total", _money(domestic_total))
+
+    def render_international(sum_cols):
+        """International shipping + tariffs/VAT and metric updater."""
+        sum_c1, sum_c2, sum_c3, sum_c4 = sum_cols
+
+        st.subheader("International shipping (optional details below)")
+        i1, i2, i3 = st.columns(3)
+        with i1:
+            pkg_weight_kg = st.number_input("Actual weight (kg)", min_value=0.0, step=0.1, value=1.5, key="int_w")
+            country = st.text_input("Destination country", value="Canada", key="int_country")
+        with i2:
+            ship_speed = st.selectbox("Service", ["Postal tracked", "Express courier"], index=0, key="int_speed")
+            fx = st.number_input("FX rate (USD→local)", min_value=0.01, step=0.01, value=1.35, key="int_fx")
+        with i3:
+            declared = st.number_input("Declared customs value (USD)", min_value=0.0, step=5.0, value=120.0, key="int_decl")
+            shipping_usd = st.number_input("Carrier shipping (USD)", min_value=0.0, step=1.0, value=28.0, key="int_ship")
+
+        # Tariffs & taxes in an expander
+        with st.expander("Tariffs / VAT / clearance (toggle as needed)", expanded=False):
+            t1, t2, t3 = st.columns(3)
+            with t1:
+                duty_rate = st.number_input("Duty rate %", min_value=0.0, step=0.5, value=5.0, key="int_duty")
+                de_minimis = st.number_input("De minimis threshold (local)", min_value=0.0, step=1.0, value=0.0, key="int_min")
+            with t2:
+                vat_rate = st.number_input("VAT / GST %", min_value=0.0, step=0.5, value=13.0, key="int_vat")
+                vat_on_ship = st.checkbox("VAT applies to shipping?", value=True, key="int_vat_ship")
+            with t3:
+                brokerage = st.number_input("Brokerage/clearance fee (local)", min_value=0.0, step=1.0, value=12.0, key="int_broker")
+                collection_fee = st.number_input("Carrier collection fee (local)", min_value=0.0, step=1.0, value=0.0, key="int_collect")
+
+            customs_base_local = declared * fx
+            duty_local = 0.0 if customs_base_local <= de_minimis else customs_base_local * (duty_rate / 100.0)
+            vat_base_local = customs_base_local + (shipping_usd * fx if vat_on_ship else 0.0) + duty_local
+            vat_local = 0.0 if customs_base_local <= de_minimis else vat_base_local * (vat_rate / 100.0)
+
+            gov_charges_local = duty_local + vat_local
+            fees_local = brokerage + collection_fee
+            landed_local = (shipping_usd * fx) + gov_charges_local + fees_local
+            landed_usd = landed_local / fx if fx else 0.0
+
+            st.markdown("**Customs/tax breakdown (local currency)**")
+            st.write(
+                f"- Customs value: **{customs_base_local:,.2f}**  "
+                f"\n- Duty: {duty_local:,.2f}  "
+                f"\n- VAT/GST: {vat_local:,.2f}  "
+                f"\n- Brokerage & fees: {fees_local:,.2f}"
+            )
+            st.info(f"International surcharges: **{(gov_charges_local + fees_local):,.2f} local**")
+
+        border_usd = (gov_charges_local + fees_local) / fx if fx else 0.0
+        total_usd = shipping_usd + border_usd
+
+        st.success(
+            f"Landed shipping + border cost: shipping **{_money(shipping_usd)}** + border **{_money(border_usd)}** "
+            f"= **{_money(total_usd)}**"
+        )
+
+        sum_c1.metric("Package weight", f"{pkg_weight_kg:.2f} kg")
+        sum_c2.metric("Ship cost", _money(shipping_usd))
+        sum_c3.metric("Tariffs/VAT", _money(border_usd))
+        sum_c4.metric("Landed total", _money(total_usd))
+
+    # ---------- Tab body ----------
+    st.header("Shipping & Tariffs")
+    sum_cols = render_summary_band()
+    st.divider()
+
+    mode = st.radio(
+        "What do you need to estimate?",
+        ["Domestic (U.S.)", "International + Tariffs/VAT"],
+        horizontal=True,
+        key="ship_mode",
+    )
+
+    if mode == "Domestic (U.S.)":
+        render_domestic(sum_cols)
+    else:
+        render_international(sum_cols)
+
+
+
     
 
 # ------------ Save and load ------------
@@ -1393,7 +1611,7 @@ with tabs[5]:
          
 
 # ------------ Report ------------
-with tabs[6]:
+with tabs[7]:
     ip = ss.inputs
     grams_pp = float(ss.get("recipe_grams_per_piece", 8.0))
     _, glaze_pp_from_recipe = glaze_per_piece_from_recipe(ss.catalog_df, ss.recipe_df, grams_pp)
@@ -1435,7 +1653,7 @@ with tabs[6]:
     st.caption("Glaze costs calculated from Catalog cost per lb/kg and recipe percents.")
 
 # ------------ About ------------
-with tabs[7]:
+with tabs[8]:
     
     st.subheader("About this app")
     st.markdown("""
@@ -1454,5 +1672,78 @@ No data is sent anywhere else.
 Alford Wayman
 Artist and owner
 Creek Road Pottery LLC
-""")
+
+# Pottery Cost Analysis App – User Guide
+
+This app was created to help potters understand the true costs behind every piece of work.  
+Each section focuses on one part of the making process, from clay weight to firing, glaze, overhead, and shipping.  
+
+---
+
+## 1. Per Unit
+- **Choose a form preset** (mugs, bowls, plates, etc.) to quickly load clay weights and glaze amounts.  
+- **Edit or upload presets** if you have your own standard forms.  
+- **Enter clay and packaging costs**, including bag price, bag weight, and clay used per piece.  
+- **Adjust for clay yield** (how much clay is lost to trimming or reclaim).  
+- **Use the shrink rate helper** to calculate shrink from wet to fired size.  
+- **Enter glaze data** from the recipe tab or manual inputs.  
+- **Add other project materials** (like cork lids or handles) for batch-specific costs.  
+
+The right side shows **total per-piece cost**.
+
+---
+
+## 2. Glaze Recipe
+- **Catalog table**: Enter raw materials and costs per lb/kg.  
+- **Recipe table**: Enter percentages for glaze formulas.  
+- **Batch converter**: Switch between grams, ounces, and pounds.  
+- See **grams/oz/lb needed, batch cost, and per-piece glaze cost**.  
+
+---
+
+## 3. Energy
+- Enter **electric kiln kWh rates and use**.  
+- Enter **fuel kiln data** (propane, natural gas, wood).  
+- Divide by pieces per firing.  
+Shows **per-piece energy cost**.
+
+---
+
+## 4. Labor & Overhead
+- **Labor**: Hourly rate × hours per piece.  
+- **Overhead**: Monthly expenses ÷ pieces per month.  
+Gives **labor and overhead per piece**.
+
+---
+
+## 5. Pricing
+- **2x2x2 rule**: Materials → wholesale → retail → distributor.  
+- **Custom margins**: Set wholesale margin % and retail multipliers.  
+Outputs wholesale, retail, and distributor prices.
+
+---
+
+## 6. Save & Load
+- **Download JSON**: Save your entire setup.  
+- **Upload JSON**: Reload saved setup.  
+- **Manage presets**: Import/export CSVs of clay weights & glaze amounts.  
+
+---
+
+## 7. Report
+Quick snapshot of:  
+- Clay, glaze, packaging, other materials, energy, labor, overhead.  
+- Wholesale, retail, and distributor prices.  
+- Notes fuel choice & glaze method.  
+
+---
+
+## 8. Shipping & Tariffs
+- **Domestic (U.S.)**: Weight, zone, service speed, insurance, handling time, dimensional weight.  
+- **International**: Customs value, FX rate, shipping cost. Toggle tariffs, VAT, brokerage.  
+Summary shows **weight, ship cost, tariffs/VAT, landed total**.
+
+---
+    """)
+
     
