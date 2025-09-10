@@ -1180,16 +1180,16 @@ with tabs[0]:
     
     with cta_col1:
         if st.button("🧪 Customize Glaze Recipe", use_container_width=True):
-            st.success("✅ Switching to Glaze Recipe tab...")
-            st.rerun()  # This will reload the page, but user can manually switch for now
-            
+            st.info("✅ Great! Now click the **Glaze Recipe** tab at the top of the page to create custom recipes and track material costs.")
+
     with cta_col2:
         if st.button("⚡ Adjust Energy Costs", use_container_width=True):
-            st.success("✅ Switch to the **Energy** tab (tab #4) to customize firing costs")
-            
+            st.info("✅ Perfect! Now click the **Energy** tab at the top to set up gas kilns, wood firing, and detailed electricity costs.")
+        
     with cta_col3:
         if st.button("📋 Full Details", use_container_width=True):
-            st.success("✅ Switch to the **Per Unit** tab (tab #2) for complete control")
+            st.info("✅ Excellent! Now click the **Per Unit** tab at the top for complete control over clay costs, shrink rates, and all cost factors.")
+
     
     # Helpful tips at bottom
     with st.expander("💡 Pricing Tips", expanded=False):
