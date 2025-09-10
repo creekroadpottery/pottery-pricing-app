@@ -17,24 +17,67 @@ def apply_quick_defaults():
         'clay_bag_weight_lb': 25.0,
         'clay_yield': 0.9,
         'packaging_per_piece': 0.5,
-        'kwh_rate': 0.15,
+        'kwh_rate': 0.24,  # Al's actual rate
         'kwh_bisque': 30.0,
         'kwh_glaze': 35.0,
         'kwh_third': 0.0,
         'pieces_per_electric_firing': 40,
         'labor_rate': 15.0,
-        'overhead_per_month': 000.0,
-        'pieces_per_month': 000,
-        'fuel_gas': 'None',
+        'overhead_per_month': 500.0,
+        'pieces_per_month': 200,
+        'fuel_gas': 'Propane',  # Default to propane
+        'lp_price_per_gal': 3.50,
+        'lp_gal_bisque': 4.7,  # Al's real usage
+        'lp_gal_glaze': 9.4,   # Al's real usage
+        'pieces_per_gas_firing': 40,
         'use_2x2x2': False,
         'wholesale_margin_pct': 50,
-        'retail_multiplier': 2,
+        'retail_multiplier': 2.0,
     }
     
     # Only set defaults if they haven't been set yet
     for key, default_val in defaults.items():
         if key not in ss.inputs:
             ss.inputs[key] = default_val
+
+def get_common_materials_list():
+    """Returns a list of common ceramic materials for searchable dropdown"""
+    return [
+        # Feldspars
+        "Custer Feldspar", "F-4 Feldspar", "G-200 Feldspar", "Minspar 200", "NC-4 Feldspar",
+        "K-200 Feldspar", "Kingman Feldspar", "Cornwall Stone", "Nepheline Syenite",
+        
+        # Silica sources
+        "Flint (Silica)", "Silica Sand", "Quartz", "Cristobalite",
+        
+        # Clays and Kaolins
+        "EPK Kaolin", "Grolleg Kaolin", "OM4 Ball Clay", "Kentucky Ball Clay", "Redart Clay",
+        "Fire Clay", "Albany Slip Clay", "Goldart Stoneware Clay", "Hawthorne Bond Clay",
+        
+        # Fluxes
+        "Gerstley Borate", "Whiting (Calcium Carbonate)", "Wollastonite", "Dolomite",
+        "Magnesium Carbonate", "Barium Carbonate", "Strontium Carbonate", "Lithium Carbonate",
+        "Pearl Ash (Potassium Carbonate)", "Soda Ash (Sodium Carbonate)", "Borax",
+        
+        # Frits
+        "Frit 3124", "Frit 3134", "Frit 3195", "Frit 3249", "Frit 3269", "Frit 3278",
+        "Frit 90", "Frit 25", "Frit 169", "Pemco P-54", "Pemco P-311",
+        
+        # Colorants (Oxides)
+        "Red Iron Oxide", "Black Iron Oxide", "Yellow Iron Oxide", "Cobalt Oxide",
+        "Cobalt Carbonate", "Copper Oxide", "Copper Carbonate", "Chrome Oxide",
+        "Chromium Oxide", "Tin Oxide", "Titanium Dioxide", "Rutile", "Ilmenite",
+        "Manganese Dioxide", "Manganese Carbonate", "Nickel Oxide", "Vanadium Pentoxide",
+        
+        # Colorants (Stains)
+        "Mason 6020 Black", "Mason 6006 Blue", "Mason 6021 Brown", "Mason 6304 Coral",
+        "Mason 6242 Crimson", "Mason 6226 Golden Yellow", "Mason 6120 Green",
+        
+        # Specialty materials
+        "Bentonite", "Zircopax (Zirconium Silicate)", "Superpax", "Zinc Oxide",
+        "Talc", "Pyrophyllite", "Spodumene", "Petalite", "Bone Ash", "Wood Ash",
+        "Alumina Hydrate", "Calcined Alumina", "CMC (Carboxymethyl Cellulose)", "Veegum T"
+    ]
 
 def ensure_cols(df, schema: dict):
     if df is None:
@@ -717,18 +760,36 @@ if "inputs" not in ss:
         clay_weight_per_piece_lb=1.0,
         clay_yield=0.9,
         packaging_per_piece=0.0,
-        kwh_rate=0.15, kwh_bisque=30.0, kwh_glaze=35.0, kwh_third=0.0, pieces_per_electric_firing=40,
-        labor_rate=15.0, hours_per_piece=0.25,
-        overhead_per_month=000.0, pieces_per_month=200,
-        use_2x2x2=False, wholesale_margin_pct=50, retail_multiplier=2,
-        # fuel defaults
-        fuel_gas="None",
-        lp_price_per_gal=3.50, lp_gal_bisque=0.0, lp_gal_glaze=0.0, pieces_per_gas_firing=40,
-        ng_price_per_therm=1.20, ng_therms_bisque=0.0, ng_therms_glaze=0.0,
-        # wood firing
-        wood_price_per_cord=300.0, wood_price_per_facecord=120.0,
-        wood_cords_bisque=0.0, wood_cords_glaze=0.0, wood_cords_third=0.0,
-        wood_facecords_bisque=0.0, wood_facecords_glaze=0.0, wood_facecords_third=0.0,
+        kwh_rate=0.24,  # Al's actual rate
+        kwh_bisque=30.0,  # Keep electric defaults for those who use electric
+        kwh_glaze=35.0, 
+        kwh_third=0.0, 
+        pieces_per_electric_firing=40,
+        labor_rate=15.0, 
+        hours_per_piece=0.25,
+        overhead_per_month=500.0, 
+        pieces_per_month=200,
+        use_2x2x2=False, 
+        wholesale_margin_pct=50, 
+        retail_multiplier=2.0,
+        # Al's propane data
+        fuel_gas="Propane",  # Default to propane since that's what Al uses
+        lp_price_per_gal=3.50, 
+        lp_gal_bisque=4.7,  # Al's 1 tank = ~4.7 gallons
+        lp_gal_glaze=9.4,   # Al's 2 tanks = ~9.4 gallons
+        pieces_per_gas_firing=40,  # We can adjust this if Al tells us his typical load
+        ng_price_per_therm=1.20, 
+        ng_therms_bisque=0.0, 
+        ng_therms_glaze=0.0,
+        # wood firing defaults (keeping your originals)
+        wood_price_per_cord=300.0, 
+        wood_price_per_facecord=120.0,
+        wood_cords_bisque=0.0, 
+        wood_cords_glaze=0.0, 
+        wood_cords_third=0.0,
+        wood_facecords_bisque=0.0, 
+        wood_facecords_glaze=0.0, 
+        wood_facecords_third=0.0,
         pieces_per_wood_firing=40,
     )
 
@@ -1538,12 +1599,77 @@ with tabs[1]:
 
 # ------------ Glaze recipe ------------
 with tabs[2]:
+    if ss.get("guidance_type") == "glaze":
+        st.success("✅ **Perfect!** Here you can create custom glaze recipes and track material costs.")
+        st.markdown("💡 **Quick tip:** Your Quick Start used a simple estimate. Build your recipe below for precise glaze costing.")
+        st.markdown("---")
     
     st.subheader("Catalog (choose cost unit)")
     if "catalog_unit" not in ss:
         ss.catalog_unit = "lb"
     ss.catalog_unit = st.radio("Catalog cost unit", ["lb", "kg"], horizontal=True, index=0 if ss.catalog_unit=="lb" else 1)
 
+    # SEARCHABLE MATERIAL ENTRY
+    with st.expander("➕ Add new materials to catalog", expanded=False):
+        st.caption("Select from 50+ common materials or enter custom names")
+        
+        # Get list of materials already in catalog
+        current_materials = list(ss.catalog_df["Material"].str.strip().str.lower()) if not ss.catalog_df.empty else []
+        common_materials = get_common_materials_list()
+        
+        # Filter out materials already in catalog
+        available_materials = [m for m in common_materials if m.lower() not in current_materials]
+        
+        add_col1, add_col2, add_col3 = st.columns([2, 1, 1])
+        
+        with add_col1:
+            # Searchable dropdown with custom option
+            material_options = ["-- Select Material --"] + available_materials + ["⌨️ Enter Custom Name"]
+            selected_material = st.selectbox(
+                "Choose material:", 
+                material_options,
+                key="material_selector"
+            )
+            
+            # Custom name input if needed
+            if selected_material == "⌨️ Enter Custom Name":
+                custom_material = st.text_input("Enter custom material name:", key="custom_material_name")
+                final_material_name = custom_material.strip()
+            elif selected_material != "-- Select Material --":
+                final_material_name = selected_material
+            else:
+                final_material_name = ""
+        
+        with add_col2:
+            if ss.catalog_unit == "lb":
+                new_cost = st.number_input("Cost per lb:", min_value=0.0, step=0.05, key="new_material_cost")
+            else:
+                new_cost = st.number_input("Cost per kg:", min_value=0.0, step=0.05, key="new_material_cost")
+        
+        with add_col3:
+            if st.button("Add Material") and final_material_name and new_cost >= 0:
+                # Create new row
+                if ss.catalog_unit == "lb":
+                    new_row = {
+                        "Material": final_material_name,
+                        "Cost_per_lb": new_cost,
+                        "Cost_per_kg": new_cost * 2.20462
+                    }
+                else:
+                    new_row = {
+                        "Material": final_material_name,
+                        "Cost_per_lb": new_cost / 2.20462,
+                        "Cost_per_kg": new_cost
+                    }
+                
+                # Add to catalog
+                new_df = pd.concat([ss.catalog_df, pd.DataFrame([new_row])], ignore_index=True)
+                ss.catalog_df = new_df.drop_duplicates(subset=["Material"], keep="last").reset_index(drop=True)
+                
+                st.success(f"Added {final_material_name}!")
+                st.rerun()
+
+    # REGULAR CATALOG EDITOR
     if ss.catalog_unit == "lb":
         edited = st.data_editor(
             ensure_cols(ss.catalog_df, {"Material": "", "Cost_per_lb": 0.0}),
@@ -1569,16 +1695,68 @@ with tabs[2]:
         edited["Cost_per_lb"] = edited["Cost_per_kg"] / 2.20462
         ss.catalog_df = edited[["Material", "Cost_per_lb", "Cost_per_kg"]]
 
+    # RECIPE SECTION WITH SEARCHABLE MATERIALS
     st.subheader("Recipe in percent")
+
+    with st.expander("➕ Add materials to recipe", expanded=False):
+        recipe_col1, recipe_col2, recipe_col3 = st.columns([2, 1, 1])
+        
+        # Get materials from catalog for recipe dropdown
+        catalog_materials = list(ss.catalog_df["Material"].str.strip()) if not ss.catalog_df.empty else []
+        recipe_materials = list(ss.recipe_df["Material"].str.strip()) if not ss.recipe_df.empty else []
+        
+        # Available materials not yet in recipe
+        available_for_recipe = [m for m in catalog_materials if m not in recipe_materials]
+        
+        with recipe_col1:
+            recipe_options = ["-- Select from Catalog --"] + available_for_recipe + ["⌨️ Enter New Material"]
+            selected_recipe_material = st.selectbox("Add material to recipe:", recipe_options, key="recipe_material_selector")
+            
+            if selected_recipe_material == "⌨️ Enter New Material":
+                custom_recipe_material = st.text_input("Material name:", key="custom_recipe_material")
+                final_recipe_material = custom_recipe_material.strip()
+            elif selected_recipe_material != "-- Select from Catalog --":
+                final_recipe_material = selected_recipe_material
+            else:
+                final_recipe_material = ""
+        
+        with recipe_col2:
+            recipe_percent = st.number_input("Percent:", min_value=0.0, step=0.1, key="recipe_percent_input")
+        
+        with recipe_col3:
+            if st.button("Add to Recipe", key="add_recipe_btn") and final_recipe_material and recipe_percent >= 0:
+                # Create new row
+                new_recipe_row = {"Material": final_recipe_material, "Percent": recipe_percent}
+                
+                # Add to recipe dataframe
+                if ss.recipe_df.empty:
+                    ss.recipe_df = pd.DataFrame([new_recipe_row])
+                else:
+                    # Remove if already exists, then add (to avoid duplicates)
+                    ss.recipe_df = ss.recipe_df[ss.recipe_df["Material"] != final_recipe_material]
+                    new_recipe_df = pd.concat([ss.recipe_df, pd.DataFrame([new_recipe_row])], ignore_index=True)
+                    ss.recipe_df = new_recipe_df
+                
+                st.success(f"Added {final_recipe_material} at {recipe_percent}%!")
+                st.rerun()
+
+    # REGULAR RECIPE EDITOR (with dynamic key for refresh)
+    recipe_editor_key = f"recipe_editor_{len(ss.recipe_df)}"  # Key changes when length changes
+
     ss.recipe_df = st.data_editor(
         ensure_cols(ss.recipe_df, {"Material": "", "Percent": 0.0}),
         column_config={
             "Material": st.column_config.TextColumn("Material"),
             "Percent": st.column_config.NumberColumn("Percent", min_value=0.0, step=0.1),
         },
-        num_rows="dynamic", use_container_width=True, key="recipe_editor"
+        num_rows="dynamic", 
+        use_container_width=True, 
+        key=recipe_editor_key  # Dynamic key forces refresh when recipe changes
     )
 
+    # BATCH CALCULATION SECTION
+    st.subheader("Batch calculator")
+    
     colA, colB = st.columns([2, 1])
     with colA:
         batch_str = st.text_input("Batch size", value="100")
@@ -1593,84 +1771,397 @@ with tabs[2]:
 
     batch_val = _to_float(batch_str)
     batch_g = batch_val if unit=="g" else batch_val*28.3495 if unit=="oz" else batch_val*453.592
+    
     if batch_g <= 0:
         st.warning("Enter a positive batch size")
+    else:
+        out, batch_total, cpg, cpo, cpl = percent_recipe_table(ss.catalog_df, ss.recipe_df, batch_g)
 
-    out, batch_total, cpg, cpo, cpl = percent_recipe_table(ss.catalog_df, ss.recipe_df, batch_g)
+        st.caption(f"Batch size {batch_g:.0f} g  •  {batch_g/28.3495:.2f} oz  •  {batch_g/453.592:.3f} lb")
+        show = out.copy()
+        if "Cost" in show.columns:
+            show["Cost"] = show["Cost"].map(money)
+        st.dataframe(show, use_container_width=True)
 
-    st.caption(f"Batch size {batch_g:.0f} g  •  {batch_g/28.3495:.2f} oz  •  {batch_g/453.592:.3f} lb")
-    show = out.copy()
-    show["Cost"] = show["Cost"].map(money)
-    st.dataframe(show, use_container_width=True)
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Batch total", money(batch_total))
+        col2.metric("Cost per gram", money(cpg))
+        col3.metric("Cost per ounce", money(cpo))
+        st.metric("Cost per pound", money(cpl))
 
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Batch total", money(batch_total))
-    col2.metric("Cost per gram", money(cpg))
-    col3.metric("Cost per ounce", money(cpo))
-    st.metric("Cost per pound", money(cpl))
-
-    grams_str = st.text_input("Grams used per piece", value=str(ss.get("recipe_grams_per_piece", 8.0)))
+    # PER PIECE CALCULATION SECTION
+    st.subheader("Per piece cost")
+    
+    grams_str = st.text_input("Grams used per piece", value=str(ss.get("recipe_grams_per_piece", 80.0)))
     try:
         ss.recipe_grams_per_piece = float(grams_str)
+        if batch_g > 0:
+            st.metric("Glaze cost per piece from this recipe", money(cpg * ss.recipe_grams_per_piece))
+        else:
+            st.caption("Enter a valid batch size above to see per-piece cost")
     except ValueError:
-        st.warning("Please enter a number")
-
-    st.metric("Glaze cost per piece from this recipe", money(cpg * ss.recipe_grams_per_piece))
+        st.warning("Please enter a number for grams per piece")
     
 
 # ------------ Energy ------------
 with tabs[3]:
+    if ss.get("guidance_type") == "energy":
+        st.success("✅ **Great choice!** Set up your exact kiln costs here.")
+        st.markdown("💡 **Your Quick Start assumed basic costs.** Enter your specific rates and usage below for precision.")
+        st.markdown("---")
+    
     ip = ss.inputs
-    col1, col2 = st.columns(2)
 
-    with col1:
-        
-        st.subheader("Electric")
-        ip["kwh_rate"] = st.number_input("Rate per kWh", min_value=0.0, value=float(ip.get("kwh_rate", 0.0)), step=0.01)
-        ip["kwh_bisque"] = st.number_input("kWh per bisque", min_value=0.0, value=float(ip.get("kwh_bisque", 0.0)), step=1.0)
-        ip["kwh_glaze"]  = st.number_input("kWh per glaze",  min_value=0.0, value=float(ip.get("kwh_glaze", 0.0)),  step=1.0)
-        ip["kwh_third"]  = st.number_input("kWh per third firing", min_value=0.0, value=float(ip.get("kwh_third", 0.0)), step=1.0)
-        ip["pieces_per_electric_firing"] = st.number_input("Pieces per electric firing", min_value=1, value=int(ip.get("pieces_per_electric_firing", 40)), step=1)
-        
-
-    with col2:
-        
-        st.subheader("Fuel")
-        ip["fuel_gas"] = st.selectbox("Fuel source", ["None", "Propane", "Natural Gas", "Wood"],
-                                      index=["None","Propane","Natural Gas","Wood"].index(str(ip.get("fuel_gas","None"))))
-
-        if ip["fuel_gas"] == "Propane":
-            ip["lp_price_per_gal"] = st.number_input("Propane price per gallon", min_value=0.0, value=float(ip.get("lp_price_per_gal", 3.50)), step=0.05)
-            ip["lp_gal_bisque"] = st.number_input("Gallons per bisque firing", min_value=0.0, value=float(ip.get("lp_gal_bisque", 0.0)), step=0.1)
-            ip["lp_gal_glaze"]  = st.number_input("Gallons per glaze firing",  min_value=0.0, value=float(ip.get("lp_gal_glaze", 0.0)),  step=0.1)
-            ip["pieces_per_gas_firing"] = st.number_input("Pieces per gas firing", min_value=1, value=int(ip.get("pieces_per_gas_firing", 40)), step=1)
-
-        elif ip["fuel_gas"] == "Natural Gas":
-            ip["ng_price_per_therm"] = st.number_input("Natural gas price per therm", min_value=0.0, value=float(ip.get("ng_price_per_therm", 1.20)), step=0.05)
-            ip["ng_therms_bisque"] = st.number_input("Therms per bisque firing", min_value=0.0, value=float(ip.get("ng_therms_bisque", 0.0)), step=0.1)
-            ip["ng_therms_glaze"]  = st.number_input("Therms per glaze firing",  min_value=0.0, value=float(ip.get("ng_therms_glaze", 0.0)),  step=0.1)
-            ip["pieces_per_gas_firing"] = st.number_input("Pieces per gas firing", min_value=1, value=int(ip.get("pieces_per_gas_firing", 40)), step=1)
-
-        elif ip["fuel_gas"] == "Wood":
-            ip["wood_price_per_cord"] = st.number_input("Wood price per cord", min_value=0.0, value=float(ip.get("wood_price_per_cord", 300.0)), step=1.0)
-            ip["wood_price_per_facecord"] = st.number_input("Wood price per face cord", min_value=0.0, value=float(ip.get("wood_price_per_facecord", 120.0)), step=1.0)
-            st.caption("Enter wood used per firing. You can mix cords and face cords. Face cord is typically one third of a full cord.")
-            cA, cB = st.columns(2)
-            with cA:
-                ip["wood_cords_bisque"] = st.number_input("Cords per bisque", min_value=0.0, value=float(ip.get("wood_cords_bisque", 0.0)), step=0.05)
-                ip["wood_cords_glaze"]  = st.number_input("Cords per glaze",  min_value=0.0, value=float(ip.get("wood_cords_glaze", 0.0)),  step=0.05)
-                ip["wood_cords_third"]  = st.number_input("Cords per third firing", min_value=0.0, value=float(ip.get("wood_cords_third", 0.0)), step=0.05)
-            with cB:
-                ip["wood_facecords_bisque"] = st.number_input("Face cords per bisque", min_value=0.0, value=float(ip.get("wood_facecords_bisque", 0.0)), step=0.1)
-                ip["wood_facecords_glaze"]  = st.number_input("Face cords per glaze",  min_value=0.0, value=float(ip.get("wood_facecords_glaze", 0.0)),  step=0.1)
-                ip["wood_facecords_third"]  = st.number_input("Face cords per third", min_value=0.0, value=float(ip.get("wood_facecords_third", 0.0)), step=0.1)
-            ip["pieces_per_wood_firing"] = st.number_input("Pieces per wood firing", min_value=1, value=int(ip.get("pieces_per_wood_firing", 40)), step=1)
+    
+    # PRIMARY FUEL SELECTION
+    st.subheader("Primary firing method")
+    
+    fuel_options = ["Electric Only", "Propane", "Natural Gas", "Wood", "Electric + Gas", "Electric + Wood"]
+    current_fuel = str(ip.get("fuel_gas", "Propane"))
+    if current_fuel not in fuel_options:
+        current_fuel = "Propane"
+    
+    ip["fuel_gas"] = st.selectbox(
+        "What do you primarily use for firing?", 
+        fuel_options,
+        index=fuel_options.index(current_fuel),
+        key="energy_fuel_selector",
+        help="💡 Choose your main firing method - this determines which cost fields to show"
+    )
+    
+    # ELECTRIC SECTION (for Electric Only, Electric + Gas, Electric + Wood)
+    if ip["fuel_gas"] in ["Electric Only", "Electric + Gas", "Electric + Wood"]:
+        if ip["fuel_gas"] == "Electric Only":
+            st.subheader("Electric kiln costs")
         else:
-            st.caption("No fuel costs included.")
-
-    st.subheader("Per piece energy now")
-    st.metric("Energy per piece", money(calc_energy(ip)))
-   
+            st.subheader("Electric kiln costs")
+            st.caption(f"💡 Electric portion of your {ip['fuel_gas'].lower()} setup")
+        
+        # Electric rate
+        ip["kwh_rate"] = st.number_input(
+            "Electricity rate per kWh", 
+            min_value=0.0, 
+            value=float(ip.get("kwh_rate", 0.24)), 
+            step=0.01,
+            help="💡 U.S. range: $0.10-0.30/kWh • Check your electric bill"
+        )
+        
+        # Three firings for electric
+        elec_col1, elec_col2, elec_col3 = st.columns(3)
+        
+        with elec_col1:
+            st.markdown("**Bisque firing**")
+            ip["kwh_bisque"] = st.number_input(
+                "kWh per bisque", 
+                min_value=0.0, 
+                value=float(ip.get("kwh_bisque", 30.0)), 
+                step=1.0,
+                help="💡 Typical: 25-40 kWh"
+            )
+            ip["pieces_per_electric_bisque"] = st.number_input(
+                "Pieces per electric bisque", 
+                min_value=1, 
+                value=int(ip.get("pieces_per_electric_bisque", 50)), 
+                step=1,
+                help="💡 Pack tight, no stilts"
+            )
+        
+        with elec_col2:
+            st.markdown("**Glaze firing**")
+            ip["kwh_glaze"] = st.number_input(
+                "kWh per glaze", 
+                min_value=0.0, 
+                value=float(ip.get("kwh_glaze", 35.0)), 
+                step=1.0,
+                help="💡 Typical: 30-45 kWh"
+            )
+            ip["pieces_per_electric_glaze"] = st.number_input(
+                "Pieces per electric glaze", 
+                min_value=1, 
+                value=int(ip.get("pieces_per_electric_glaze", 40)), 
+                step=1,
+                help="💡 Need stilts, spacing"
+            )
+        
+        with elec_col3:
+            st.markdown("**Third firing** (luster, china paint)")
+            ip["kwh_third"] = st.number_input(
+                "kWh per third", 
+                min_value=0.0, 
+                value=float(ip.get("kwh_third", 25.0)), 
+                step=1.0,
+                help="💡 Lower temp: 20-30 kWh"
+            )
+            ip["pieces_per_electric_third"] = st.number_input(
+                "Pieces per electric third", 
+                min_value=0, 
+                value=int(ip.get("pieces_per_electric_third", 0)), 
+                step=1,
+                help="💡 Default 0 = no third firing cost"
+            )
+    
+    # PROPANE SECTION (for Propane, Electric + Gas)
+    if ip["fuel_gas"] in ["Propane", "Electric + Gas"]:
+        if ip["fuel_gas"] == "Electric + Gas":
+            st.subheader("Propane costs (additional)")
+            st.caption("💡 These costs will be added to your electric costs above")
+        else:
+            st.subheader("Propane costs")
+        
+        st.caption("💡 **Al's real data:** 1 tank bisque (~5 gal), 2 tanks glaze (~9 gal)")
+        
+        # Propane rate
+        ip["lp_price_per_gal"] = st.number_input(
+            "Propane price per gallon", 
+            min_value=0.0, 
+            value=float(ip.get("lp_price_per_gal", 3.50)), 
+            step=0.05,
+            help="💡 Typical: $2.50-4.50/gallon"
+        )
+        
+        # Three firings for propane
+        prop_col1, prop_col2, prop_col3 = st.columns(3)
+        
+        with prop_col1:
+            st.markdown("**Bisque firing**")
+            ip["lp_gal_bisque"] = st.number_input(
+                "Gallons per bisque", 
+                min_value=0.0, 
+                value=float(ip.get("lp_gal_bisque", 4.7)), 
+                step=0.1,
+                help="💡 1 × 20lb tank ≈ 4.7 gal"
+            )
+            ip["pieces_per_propane_bisque"] = st.number_input(
+                "Pieces per propane bisque", 
+                min_value=1, 
+                value=int(ip.get("pieces_per_propane_bisque", 50)), 
+                step=1
+            )
+        
+        with prop_col2:
+            st.markdown("**Glaze firing**")
+            ip["lp_gal_glaze"] = st.number_input(
+                "Gallons per glaze", 
+                min_value=0.0, 
+                value=float(ip.get("lp_gal_glaze", 9.4)), 
+                step=0.1,
+                help="💡 2 × 20lb tanks ≈ 9.4 gal"
+            )
+            ip["pieces_per_propane_glaze"] = st.number_input(
+                "Pieces per propane glaze", 
+                min_value=1, 
+                value=int(ip.get("pieces_per_propane_glaze", 40)), 
+                step=1
+            )
+        
+        with prop_col3:
+            st.markdown("**Third firing**")
+            ip["lp_gal_third"] = st.number_input(
+                "Gallons per third", 
+                min_value=0.0, 
+                value=float(ip.get("lp_gal_third", 4.7)), 
+                step=0.1,
+                help="💡 Lower temp, less fuel"
+            )
+            ip["pieces_per_propane_third"] = st.number_input(
+                "Pieces per propane third", 
+                min_value=0, 
+                value=int(ip.get("pieces_per_propane_third", 0)), 
+                step=1,
+                help="💡 Default 0 = no third firing cost"
+            )
+    
+    # NATURAL GAS SECTION
+    if ip["fuel_gas"] == "Natural Gas":
+        st.subheader("Natural gas costs")
+        
+        # Natural gas rate
+        ip["ng_price_per_therm"] = st.number_input(
+            "Natural gas price per therm", 
+            min_value=0.0, 
+            value=float(ip.get("ng_price_per_therm", 1.20)), 
+            step=0.05,
+            help="💡 Typical: $0.80-2.00/therm"
+        )
+        
+        # Three firings for natural gas
+        ng_col1, ng_col2, ng_col3 = st.columns(3)
+        
+        with ng_col1:
+            st.markdown("**Bisque firing**")
+            ip["ng_therms_bisque"] = st.number_input(
+                "Therms per bisque", 
+                min_value=0.0, 
+                value=float(ip.get("ng_therms_bisque", 8.0)), 
+                step=0.1
+            )
+            ip["pieces_per_ng_bisque"] = st.number_input(
+                "Pieces per NG bisque", 
+                min_value=1, 
+                value=int(ip.get("pieces_per_ng_bisque", 50)), 
+                step=1
+            )
+        
+        with ng_col2:
+            st.markdown("**Glaze firing**")
+            ip["ng_therms_glaze"] = st.number_input(
+                "Therms per glaze", 
+                min_value=0.0, 
+                value=float(ip.get("ng_therms_glaze", 12.0)), 
+                step=0.1
+            )
+            ip["pieces_per_ng_glaze"] = st.number_input(
+                "Pieces per NG glaze", 
+                min_value=1, 
+                value=int(ip.get("pieces_per_ng_glaze", 40)), 
+                step=1
+            )
+        
+        with ng_col3:
+            st.markdown("**Third firing**")
+            ip["ng_therms_third"] = st.number_input(
+                "Therms per third", 
+                min_value=0.0, 
+                value=float(ip.get("ng_therms_third", 6.0)), 
+                step=0.1
+            )
+            ip["pieces_per_ng_third"] = st.number_input(
+                "Pieces per NG third", 
+                min_value=0, 
+                value=int(ip.get("pieces_per_ng_third", 0)), 
+                step=1,
+                help="💡 Default 0 = no third firing cost"
+            )
+    
+    # WOOD SECTION (for Wood, Electric + Wood)
+    if ip["fuel_gas"] in ["Wood", "Electric + Wood"]:
+        if ip["fuel_gas"] == "Electric + Wood":
+            st.subheader("Wood firing costs (additional)")
+            st.caption("💡 These costs will be added to your electric costs above")
+        else:
+            st.subheader("Wood firing costs")
+        
+        st.caption("💡 **Wood firing:** Often electric bisque + wood glaze. Third firing rare with wood.")
+        
+        # Wood pricing
+        wood_price_col1, wood_price_col2 = st.columns(2)
+        with wood_price_col1:
+            ip["wood_price_per_cord"] = st.number_input(
+                "Wood price per cord", 
+                min_value=0.0, 
+                value=float(ip.get("wood_price_per_cord", 300.0)), 
+                step=1.0,
+                help="💡 Full cord: 4' × 4' × 8'"
+            )
+        with wood_price_col2:
+            ip["wood_price_per_facecord"] = st.number_input(
+                "Wood price per face cord", 
+                min_value=0.0, 
+                value=float(ip.get("wood_price_per_facecord", 120.0)), 
+                step=1.0,
+                help="💡 Face cord ≈ 1/3 full cord"
+            )
+        
+        # Three firings for wood (though bisque and third often not used)
+        wood_col1, wood_col2, wood_col3 = st.columns(3)
+        
+        with wood_col1:
+            st.markdown("**Bisque firing** (rare)")
+            ip["wood_cords_bisque"] = st.number_input(
+                "Cords per bisque", 
+                min_value=0.0, 
+                value=float(ip.get("wood_cords_bisque", 0.0)), 
+                step=0.05,
+                help="💡 Usually electric for bisque"
+            )
+            ip["wood_facecords_bisque"] = st.number_input(
+                "Face cords per bisque", 
+                min_value=0.0, 
+                value=float(ip.get("wood_facecords_bisque", 0.0)), 
+                step=0.1
+            )
+            ip["pieces_per_wood_bisque"] = st.number_input(
+                "Pieces per wood bisque", 
+                min_value=1, 
+                value=int(ip.get("pieces_per_wood_bisque", 40)), 
+                step=1
+            )
+        
+        with wood_col2:
+            st.markdown("**Glaze firing** (main)")
+            ip["wood_cords_glaze"] = st.number_input(
+                "Cords per glaze", 
+                min_value=0.0, 
+                value=float(ip.get("wood_cords_glaze", 1.5)), 
+                step=0.05,
+                help="💡 Weekend firing: 1-2 cords"
+            )
+            ip["wood_facecords_glaze"] = st.number_input(
+                "Face cords per glaze", 
+                min_value=0.0, 
+                value=float(ip.get("wood_facecords_glaze", 0.0)), 
+                step=0.1
+            )
+            ip["pieces_per_wood_glaze"] = st.number_input(
+                "Pieces per wood glaze", 
+                min_value=1, 
+                value=int(ip.get("pieces_per_wood_glaze", 40)), 
+                step=1
+            )
+        
+        with wood_col3:
+            st.markdown("**Third firing** (very rare)")
+            ip["wood_cords_third"] = st.number_input(
+                "Cords per third", 
+                min_value=0.0, 
+                value=float(ip.get("wood_cords_third", 0.0)), 
+                step=0.05,
+                help="💡 Rarely done with wood"
+            )
+            ip["wood_facecords_third"] = st.number_input(
+                "Face cords per third", 
+                min_value=0.0, 
+                value=float(ip.get("wood_facecords_third", 0.0)), 
+                step=0.1
+            )
+            ip["pieces_per_wood_third"] = st.number_input(
+                "Pieces per wood third", 
+                min_value=0, 
+                value=int(ip.get("pieces_per_wood_third", 0)), 
+                step=1,
+                help="💡 Default 0 = no cost"
+            )
+    
+    # RESULTS SECTION
+    st.subheader("Per piece energy cost")
+    energy_cost = calc_energy(ip)
+    st.metric("Energy per piece", money(energy_cost))
+    
+    # Detailed breakdown
+    if energy_cost > 0:
+        with st.expander("🔍 Cost breakdown", expanded=False):
+            if ip["fuel_gas"] == "Electric Only":
+                bisque_cost = ip.get("kwh_bisque", 0) * ip.get("kwh_rate", 0) / max(1, ip.get("pieces_per_electric_bisque", 1))
+                glaze_cost = ip.get("kwh_glaze", 0) * ip.get("kwh_rate", 0) / max(1, ip.get("pieces_per_electric_glaze", 1))
+                third_pieces = max(1, ip.get("pieces_per_electric_third", 1)) if ip.get("pieces_per_electric_third", 0) > 0 else 1
+                third_cost = ip.get("kwh_third", 0) * ip.get("kwh_rate", 0) / third_pieces if ip.get("pieces_per_electric_third", 0) > 0 else 0
+                st.write(f"• Bisque: {money(bisque_cost)} per piece")
+                st.write(f"• Glaze: {money(glaze_cost)} per piece") 
+                st.write(f"• Third: {money(third_cost)} per piece")
+                
+            elif ip["fuel_gas"] == "Propane":
+                bisque_cost = ip.get("lp_gal_bisque", 0) * ip.get("lp_price_per_gal", 0) / max(1, ip.get("pieces_per_propane_bisque", 1))
+                glaze_cost = ip.get("lp_gal_glaze", 0) * ip.get("lp_price_per_gal", 0) / max(1, ip.get("pieces_per_propane_glaze", 1))
+                third_pieces = max(1, ip.get("pieces_per_propane_third", 1)) if ip.get("pieces_per_propane_third", 0) > 0 else 1
+                third_cost = ip.get("lp_gal_third", 0) * ip.get("lp_price_per_gal", 0) / third_pieces if ip.get("pieces_per_propane_third", 0) > 0 else 0
+                st.write(f"• Bisque: {money(bisque_cost)} per piece")
+                st.write(f"• Glaze: {money(glaze_cost)} per piece")
+                st.write(f"• Third: {money(third_cost)} per piece")
+                
+            else:
+                st.write(f"Combined {ip['fuel_gas'].lower()} firing costs")
+    else:
+        st.caption("💡 Set your firing costs above to see energy cost per piece")
 
 # ------------ Labor and overhead ------------
 with tabs[4]:
