@@ -10,6 +10,32 @@ ss = st.session_state
 
 
 # ------------ Helpers ------------
+def apply_quick_defaults():
+    """Apply sensible defaults for quick start mode."""
+    defaults = {
+        'clay_price_per_bag': 50.0,
+        'clay_bag_weight_lb': 25.0,
+        'clay_yield': 0.9,
+        'packaging_per_piece': 0.5,
+        'kwh_rate': 0.15,
+        'kwh_bisque': 30.0,
+        'kwh_glaze': 35.0,
+        'kwh_third': 0.0,
+        'pieces_per_electric_firing': 40,
+        'labor_rate': 15.0,
+        'overhead_per_month': 000.0,
+        'pieces_per_month': 000,
+        'fuel_gas': 'None',
+        'use_2x2x2': False,
+        'wholesale_margin_pct': 50,
+        'retail_multiplier': 2,
+    }
+    
+    # Only set defaults if they haven't been set yet
+    for key, default_val in defaults.items():
+        if key not in ss.inputs:
+            ss.inputs[key] = default_val
+
 def ensure_cols(df, schema: dict):
     if df is None:
         df = pd.DataFrame()
@@ -693,8 +719,8 @@ if "inputs" not in ss:
         packaging_per_piece=0.0,
         kwh_rate=0.15, kwh_bisque=30.0, kwh_glaze=35.0, kwh_third=0.0, pieces_per_electric_firing=40,
         labor_rate=15.0, hours_per_piece=0.25,
-        overhead_per_month=500.0, pieces_per_month=200,
-        use_2x2x2=False, wholesale_margin_pct=50, retail_multiplier=2.2,
+        overhead_per_month=000.0, pieces_per_month=200,
+        use_2x2x2=False, wholesale_margin_pct=50, retail_multiplier=2,
         # fuel defaults
         fuel_gas="None",
         lp_price_per_gal=3.50, lp_gal_bisque=0.0, lp_gal_glaze=0.0, pieces_per_gas_firing=40,
@@ -733,7 +759,7 @@ if "glaze_piece_df" not in ss:
 # other materials default
 if "other_mat_df" not in ss:
     ss.other_mat_df = pd.DataFrame([
-        {"Item":"Hand pump","Unit":"each","Cost_per_unit":0.85,"Quantity_for_project":16.0},
+        {"Item":"","Unit":"","Cost_per_unit":0.0,"Quantity_for_project":0.0},
     ])
 
 # ------------ Glaze helpers ------------
@@ -849,22 +875,342 @@ def calc_totals(ip, glaze_per_piece_cost, other_pp: float = 0.0):
 st.title("Pottery Cost Analysis App")
 
 tab_titles = [
-    "Per Unit",
+    "Quick Start",      # NEW - becomes tab 0
+    "Per Unit",         # existing tabs shift to 1, 2, 3...
     "Glaze Recipe",
-    "Energy",
+    "Energy", 
     "Labor and Overhead",
     "Pricing",
     "Save and Load",
-    "Shipping & Tariffs",   # <— new tab
+    "Shipping & Tariffs",
     "Report",
     "About",
 ]
 tabs = st.tabs(tab_titles)
 
+# ------------- Quick Start Tab (POLISHED) -------------
+with tabs[0]:
+    st.header("🎯 Quick Price Calculator")
+    st.markdown("**Get pricing for your pottery in under 2 minutes**")
+    
+    # Apply defaults
+    apply_quick_defaults()
+    
+    # Add a session state variable to control tab switching
+    if "target_tab" not in ss:
+        ss.target_tab = None
+    
+    # Create two columns for clean layout
+    left_col, right_col = st.columns([3, 2])
+    
+    with left_col:
+        st.subheader("1. What are you making?")
+        
+        # Form selector using existing presets
+        init_form_presets_in_state()  # Make sure presets are loaded
+        presets_df = ss.form_presets_df.copy()
+        
+        # Get popular forms (first 20 or so)
+        popular_forms = presets_df.head(20)["Form"].tolist() if not presets_df.empty else []
+        
+        selected_form = st.selectbox(
+            "Choose a form:",
+            ["Custom"] + popular_forms,
+            index=1 if popular_forms else 0,
+            help="Can't find your form? Choose 'Custom' or switch to the 'Per Unit' tab for full control."
+        )
+        
+        # Get preset values if form is selected
+        clay_weight = 1.0
+        glaze_amount = 80
+        confidence_factors = {"form": False}
+        
+        if selected_form != "Custom" and not presets_df.empty:
+            preset_row = presets_df.loc[presets_df["Form"] == selected_form].iloc[0]
+            preset_clay_lb = float(preset_row.get("Clay_lb_wet", 1.0))
+            preset_glaze_g = float(preset_row.get("Default_glaze_g", 80))
+            
+            # Show preset info
+            c1, c2 = st.columns(2)
+            c1.metric("Clay weight", f"{preset_clay_lb:.2f} lb")
+            c2.metric("Glaze amount", f"{preset_glaze_g:.0f} g")
+            
+            # Auto-apply to session state
+            ss.inputs["clay_weight_per_piece_lb"] = preset_clay_lb
+            ss.recipe_grams_per_piece = preset_glaze_g
+            clay_weight = preset_clay_lb
+            glaze_amount = preset_glaze_g
+            confidence_factors["form"] = True
+        else:
+            # Manual entry for custom with validation
+            clay_weight = st.number_input(
+                "Clay weight per piece (lb):",
+                min_value=0.1,
+                max_value=20.0,  # Reasonable upper limit
+                value=float(ss.inputs.get("clay_weight_per_piece_lb", 1.0)),
+                step=0.1,
+                help="💡 Typical range: 0.5-5 lbs for most functional pottery"
+            )
+            ss.inputs["clay_weight_per_piece_lb"] = clay_weight
+            confidence_factors["form"] = clay_weight > 0
+        
+        st.subheader("2. Basic costs")
+        
+        col_a, col_b = st.columns(2)
+        with col_a:
+            # Clay cost - simplified with validation
+            clay_method = st.radio("Clay cost:", ["Per bag", "Per pound"], horizontal=True)
+            
+            if clay_method == "Per bag":
+                bag_cost = st.number_input(
+                    "Cost per bag:", 
+                    min_value=0.0, 
+                    max_value=200.0,
+                    value=50.0, 
+                    step=1.0,
+                    help="💡 Typical range: $25-80 per bag for stoneware"
+                )
+                bag_weight = st.number_input(
+                    "Bag weight (lb):", 
+                    min_value=1.0, 
+                    max_value=100.0,
+                    value=25.0, 
+                    step=1.0,
+                    help="💡 Most common: 25 or 50 lb bags"
+                )
+                
+                # Validation
+                if bag_cost <= 0 or bag_weight <= 0:
+                    st.warning("⚠️ Please enter positive values for bag cost and weight")
+                    confidence_factors["clay"] = False
+                else:
+                    ss.inputs["clay_price_per_bag"] = bag_cost
+                    ss.inputs["clay_bag_weight_lb"] = bag_weight
+                    clay_per_lb = bag_cost / bag_weight
+                    st.caption(f"= {money(clay_per_lb)} per pound")
+                    confidence_factors["clay"] = True
+            else:
+                clay_per_lb = st.number_input(
+                    "Cost per pound:", 
+                    min_value=0.0, 
+                    max_value=10.0,
+                    value=2.00, 
+                    step=0.05,
+                    help="💡 Typical range: $1-4 per pound"
+                )
+                if clay_per_lb <= 0:
+                    st.warning("⚠️ Please enter a positive clay cost")
+                    confidence_factors["clay"] = False
+                else:
+                    ss.inputs["clay_price_per_bag"] = clay_per_lb * 25  # Assume 25lb bags
+                    ss.inputs["clay_bag_weight_lb"] = 25.0
+                    confidence_factors["clay"] = True
+        
+        with col_b:
+            # Time and labor with validation
+            hours_input = st.number_input(
+                "Total time per piece (hours):",
+                min_value=0.1,
+                max_value=20.0,
+                value=float(ss.inputs.get("hours_per_piece", 0.5)),
+                step=0.25,
+                help="💡 Typical range: 0.5-3 hours total (throwing + trimming + glazing + loading)"
+            )
+            
+            labor_input = st.number_input(
+                "Your time is worth ($/hour):",
+                min_value=1.0,
+                max_value=200.0,
+                value=float(ss.inputs.get("labor_rate", 15.0)),
+                step=1.0,
+                help="💡 Most potters: $12-30/hour • Experienced: $25-50/hour"
+            )
+            
+            # Validation and application
+            if hours_input <= 0:
+                st.warning("⚠️ Time must be greater than 0")
+                confidence_factors["labor"] = False
+            else:
+                ss.inputs["hours_per_piece"] = hours_input
+                confidence_factors["labor"] = True
+                
+            if labor_input <= 0:
+                st.warning("⚠️ Labor rate must be greater than 0")
+            else:
+                ss.inputs["labor_rate"] = labor_input
+        
+        # Advanced toggle with validation
+        with st.expander("⚙️ Adjust other costs (optional)"):
+            st.caption("These have sensible defaults, but you can customize:")
+            
+            adj_a, adj_b = st.columns(2)
+            with adj_a:
+                elec_rate = st.number_input(
+                    "Electricity rate ($/kWh):",
+                    min_value=0.0,
+                    max_value=1.0,
+                    value=float(ss.inputs.get("kwh_rate", 0.15)),
+                    step=0.01,
+                    help="💡 U.S. average: $0.12-0.20/kWh"
+                )
+                ss.inputs["kwh_rate"] = max(0.0, elec_rate)
+                
+                pack_cost = st.number_input(
+                    "Packaging per piece ($):",
+                    min_value=0.0,
+                    max_value=20.0,
+                    value=float(ss.inputs.get("packaging_per_piece", 0.5)),
+                    step=0.1,
+                    help="💡 Boxes, bubble wrap, labels: $0.25-2.00"
+                )
+                ss.inputs["packaging_per_piece"] = max(0.0, pack_cost)
+            
+            with adj_b:
+                overhead = st.number_input(
+                    "Monthly overhead ($):",
+                    min_value=0.0,
+                    max_value=10000.0,
+                    value=float(ss.inputs.get("overhead_per_month", 500.0)),
+                    step=50.0,
+                    help="💡 Studio rent, insurance, utilities: $200-2000/month"
+                )
+                ss.inputs["overhead_per_month"] = max(0.0, overhead)
+                
+                pieces_month = st.number_input(
+                    "Pieces you make per month:",
+                    min_value=1,
+                    max_value=2000,
+                    value=int(ss.inputs.get("pieces_per_month", 200)),
+                    step=10,
+                    help="💡 Hobbyist: 20-50 • Part-time: 50-150 • Full-time: 200+"
+                )
+                ss.inputs["pieces_per_month"] = max(1, pieces_month)
+    
+    with right_col:
+        st.subheader("💰 Your Pricing")
+        
+        # Calculate confidence score
+        confidence_score = sum([
+            confidence_factors.get("form", False),
+            confidence_factors.get("clay", False), 
+            confidence_factors.get("labor", False),
+        ]) / 3 * 100
+        
+        # Confidence indicator
+        if confidence_score >= 80:
+            confidence_color = "🟢"
+            confidence_text = "High confidence"
+        elif confidence_score >= 60:
+            confidence_color = "🟡" 
+            confidence_text = "Medium confidence"
+        else:
+            confidence_color = "🔴"
+            confidence_text = "Low confidence - check inputs"
+            
+        st.metric(
+            label="Estimate Confidence",
+            value=f"{confidence_color} {confidence_text}",
+            help="Based on completeness of your inputs. Green = reliable estimate, Red = may need adjustment"
+        )
+        
+        # Calculate costs using existing functions
+        grams_pp = float(ss.get("recipe_grams_per_piece", glaze_amount))
+        _, glaze_pp_cost = glaze_per_piece_from_recipe(ss.catalog_df, ss.recipe_df, grams_pp)
+        
+        # Use a simple glaze cost if recipe is empty
+        if glaze_pp_cost <= 0:
+            glaze_pp_cost = grams_pp * 0.01  # Rough estimate: 1 cent per gram
+        
+        other_pp, _, _ = other_materials_pp(ss.other_mat_df, int(ss.inputs.get("units_made", 1)))
+        
+        # Only calculate if we have valid inputs
+        if confidence_factors.get("clay", False) and confidence_factors.get("labor", False):
+            totals = calc_totals(ss.inputs, glaze_pp_cost, other_pp)
+            
+            # Display results prominently
+            st.markdown("---")
+            
+            # Cost breakdown
+            with st.container():
+                st.markdown("**Cost breakdown per piece:**")
+                cost_col1, cost_col2 = st.columns(2)
+                
+                with cost_col1:
+                    st.write(f"• Clay: {money(totals['clay_pp'])}")
+                    st.write(f"• Glaze: {money(totals['glaze_pp'])}")
+                    st.write(f"• Labor: {money(totals['labor_pp'])}")
+                
+                with cost_col2:
+                    st.write(f"• Energy: {money(totals['energy_pp'])}")
+                    st.write(f"• Overhead: {money(totals['oh_pp'])}")
+                    st.write(f"• Other: {money(totals['pack_pp'] + totals['other_pp'])}")
+            
+            st.markdown("---")
+            
+            # Final prices - big and bold
+            st.metric(
+                label="🏪 WHOLESALE PRICE",
+                value=money(totals["wholesale"]),
+                help="What to charge stores and galleries (50% margin built in)"
+            )
+            
+            st.metric(
+                label="🛒 RETAIL PRICE", 
+                value=money(totals["retail"]),
+                help="What to charge individual customers (2x wholesale)"
+            )
+            
+            st.metric(
+                label="📊 Your Cost",
+                value=money(totals["total_pp"]),
+                help="Never sell below this! This covers all your expenses."
+            )
+            
+            # Profit margins
+            st.caption("Wholesale: 2x cost • Retail: 2x wholesale")
+            
+        else:
+            st.info("💡 Complete the required fields above to see your pricing")
+    
+    # Call to action - FUNCTIONAL BUTTONS
+    st.markdown("---")
+    st.markdown("### 🚀 Want more control?")
+    
+    cta_col1, cta_col2, cta_col3 = st.columns(3)
+    
+    with cta_col1:
+        if st.button("🧪 Customize Glaze Recipe", use_container_width=True):
+            st.success("✅ Switching to Glaze Recipe tab...")
+            st.rerun()  # This will reload the page, but user can manually switch for now
+            
+    with cta_col2:
+        if st.button("⚡ Adjust Energy Costs", use_container_width=True):
+            st.success("✅ Switch to the **Energy** tab (tab #4) to customize firing costs")
+            
+    with cta_col3:
+        if st.button("📋 Full Details", use_container_width=True):
+            st.success("✅ Switch to the **Per Unit** tab (tab #2) for complete control")
+    
+    # Helpful tips at bottom
+    with st.expander("💡 Pricing Tips", expanded=False):
+        st.markdown("""
+        **Quick guidelines:**
+        - **Never sell below cost** - that's the red "Your Cost" number above
+        - **Wholesale = 2x cost** - gives you 50% margin to cover unexpected expenses  
+        - **Retail = 2.2x wholesale** - standard markup that galleries expect
+        - **Track your actual time** - most potters underestimate by 30-50%
+        - **Include ALL costs** - studio rent, insurance, equipment wear, your salary
+        - **Price confidently** - handmade pottery has real value
+        
+        **Regional benchmarks:**
+        - Coffee mugs: $18-35 retail
+        - Cereal bowls: $22-40 retail  
+        - Dinner plates: $28-50 retail
+        """)
 
 
 # ------------- Per unit -------------
-with tabs[0]:
+with tabs[1]:
     ip = ss.inputs
     left, right = st.columns(2)
 
@@ -1191,7 +1537,7 @@ with tabs[0]:
 
 
 # ------------ Glaze recipe ------------
-with tabs[1]:
+with tabs[2]:
     
     st.subheader("Catalog (choose cost unit)")
     if "catalog_unit" not in ss:
@@ -1273,7 +1619,7 @@ with tabs[1]:
     
 
 # ------------ Energy ------------
-with tabs[2]:
+with tabs[3]:
     ip = ss.inputs
     col1, col2 = st.columns(2)
 
@@ -1327,7 +1673,7 @@ with tabs[2]:
    
 
 # ------------ Labor and overhead ------------
-with tabs[3]:
+with tabs[4]:
     ip = ss.inputs
    
     st.subheader("Labor")
@@ -1339,7 +1685,7 @@ with tabs[3]:
     ip["pieces_per_month"] = st.number_input("Pieces per month", min_value=1, value=int(ip["pieces_per_month"]), step=10)
     
 # ------------ Pricing ------------
-with tabs[4]:
+with tabs[5]:
     ip = ss.inputs
     
 
@@ -1568,7 +1914,7 @@ with tabs[tab_titles.index("Shipping & Tariffs")]:
     
 
 # ------------ Save and load ------------
-with tabs[5]:
+with tabs[6]:
     
     st.subheader("Save and load settings")
     state = dict(
@@ -1608,7 +1954,7 @@ with tabs[5]:
          
 
 # ------------ Report ------------
-with tabs[7]:
+with tabs[8]:
     ip = ss.inputs
     grams_pp = float(ss.get("recipe_grams_per_piece", 8.0))
     _, glaze_pp_from_recipe = glaze_per_piece_from_recipe(ss.catalog_df, ss.recipe_df, grams_pp)
@@ -1650,7 +1996,7 @@ with tabs[7]:
     st.caption("Glaze costs calculated from Catalog cost per lb/kg and recipe percents.")
 
 # ------------ About ------------
-with tabs[8]:
+with tabs[9]:
     
     st.subheader("About this app")
     st.markdown("""
