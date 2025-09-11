@@ -11,6 +11,206 @@ ss = st.session_state
 
 
 # ------------ Helpers ------------
+def ensure_cols(df, schema: dict):
+    if df is None or df.empty:
+        return pd.DataFrame(columns=list(schema.keys()))
+    
+    df = df.copy()
+    
+    # Add missing columns
+    for col, default in schema.items():
+        if col not in df.columns:
+            df[col] = default
+    
+    # Keep only schema columns in correct order
+    df = df[list(schema.keys())]
+    
+    return df
+
+# ------------ Unified Form Management System ------------
+UNIFIED_FORM_SCHEMA = {
+    "Form": "",
+    "Clay_lb_wet": 0.0,
+    "Default_glaze_g": 0.0,
+    "Throwing_min": 0.0,
+    "Trimming_min": 0.0,
+    "Handling_min": 0.0,
+    "Glazing_min": 0.0,
+    "Pieces_per_shelf": 0,
+    "Notes": ""
+}
+
+def migrate_to_unified_forms():
+    """Migrate from 3 separate form databases to 1 unified one"""
+    unified = pd.DataFrame(columns=list(UNIFIED_FORM_SCHEMA.keys()))
+    
+    # Migrate from form_presets_df (clay + glaze data)
+    if "form_presets_df" in ss and not ss.form_presets_df.empty:
+        for _, row in ss.form_presets_df.iterrows():
+            new_row = {
+                "Form": str(row.get("Form", "")).strip(),
+                "Clay_lb_wet": float(row.get("Clay_lb_wet", 0.0)),
+                "Default_glaze_g": float(row.get("Default_glaze_g", 0.0)),
+                "Throwing_min": 0.0,  # defaults
+                "Trimming_min": 0.0,
+                "Handling_min": 0.0,
+                "Glazing_min": 0.0,
+                "Pieces_per_shelf": 0,
+                "Notes": str(row.get("Notes", "")).strip()
+            }
+            unified = pd.concat([unified, pd.DataFrame([new_row])], ignore_index=True)
+    
+    # Migrate from production_forms (timing data)
+    if "production_forms" in ss and not ss.production_forms.empty:
+        for _, row in ss.production_forms.iterrows():
+            form_name = str(row.get("Form", "")).strip()
+            if not form_name:
+                continue
+                
+            # Check if this form already exists from presets
+            existing_idx = unified[unified["Form"] == form_name].index
+            if len(existing_idx) > 0:
+                # Update existing row with timing data
+                idx = existing_idx[0]
+                unified.at[idx, "Throwing_min"] = float(row.get("Throwing_min", 0.0))
+                unified.at[idx, "Trimming_min"] = float(row.get("Trimming_min", 0.0))
+                unified.at[idx, "Handling_min"] = float(row.get("Handling_min", 0.0))
+                unified.at[idx, "Glazing_min"] = float(row.get("Glazing_min", 0.0))
+                unified.at[idx, "Pieces_per_shelf"] = int(row.get("Pieces_per_shelf", 0))
+                # Merge notes
+                existing_notes = str(unified.at[idx, "Notes"]).strip()
+                new_notes = str(row.get("Notes", "")).strip()
+                if existing_notes and new_notes and existing_notes != new_notes:
+                    unified.at[idx, "Notes"] = f"{existing_notes} | {new_notes}"
+                elif new_notes:
+                    unified.at[idx, "Notes"] = new_notes
+            else:
+                # Add new row with timing data
+                new_row = {
+                    "Form": form_name,
+                    "Clay_lb_wet": 0.0,  # defaults
+                    "Default_glaze_g": 0.0,
+                    "Throwing_min": float(row.get("Throwing_min", 0.0)),
+                    "Trimming_min": float(row.get("Trimming_min", 0.0)),
+                    "Handling_min": float(row.get("Handling_min", 0.0)),
+                    "Glazing_min": float(row.get("Glazing_min", 0.0)),
+                    "Pieces_per_shelf": int(row.get("Pieces_per_shelf", 0)),
+                    "Notes": str(row.get("Notes", "")).strip()
+                }
+                unified = pd.concat([unified, pd.DataFrame([new_row])], ignore_index=True)
+    
+    # Migrate from custom_forms (user timing data)
+    if "custom_forms" in ss and not ss.custom_forms.empty:
+        for _, row in ss.custom_forms.iterrows():
+            form_name = str(row.get("Form", "")).strip()
+            if not form_name:
+                continue
+                
+            # Check if this form already exists
+            existing_idx = unified[unified["Form"] == form_name].index
+            if len(existing_idx) > 0:
+                # Update existing row
+                idx = existing_idx[0]
+                unified.at[idx, "Throwing_min"] = float(row.get("Throwing_min", 0.0))
+                unified.at[idx, "Trimming_min"] = float(row.get("Trimming_min", 0.0))
+                unified.at[idx, "Handling_min"] = float(row.get("Handling_min", 0.0))
+                unified.at[idx, "Glazing_min"] = float(row.get("Glazing_min", 0.0))
+                unified.at[idx, "Pieces_per_shelf"] = int(row.get("Pieces_per_shelf", 0))
+                # Merge notes
+                existing_notes = str(unified.at[idx, "Notes"]).strip()
+                new_notes = str(row.get("Notes", "")).strip()
+                if existing_notes and new_notes and existing_notes != new_notes:
+                    unified.at[idx, "Notes"] = f"{existing_notes} | {new_notes}"
+                elif new_notes:
+                    unified.at[idx, "Notes"] = new_notes
+            else:
+                # Add new row
+                new_row = {
+                    "Form": form_name,
+                    "Clay_lb_wet": 0.0,  # defaults
+                    "Default_glaze_g": 0.0,
+                    "Throwing_min": float(row.get("Throwing_min", 0.0)),
+                    "Trimming_min": float(row.get("Trimming_min", 0.0)),
+                    "Handling_min": float(row.get("Handling_min", 0.0)),
+                    "Glazing_min": float(row.get("Glazing_min", 0.0)),
+                    "Pieces_per_shelf": int(row.get("Pieces_per_shelf", 0)),
+                    "Notes": str(row.get("Notes", "")).strip()
+                }
+                unified = pd.concat([unified, pd.DataFrame([new_row])], ignore_index=True)
+    
+    # Remove duplicates and clean up
+    unified = unified.drop_duplicates(subset=["Form"], keep="last").reset_index(drop=True)
+    
+    # Ensure proper data types
+    for col, default_val in UNIFIED_FORM_SCHEMA.items():
+        if col not in unified.columns:
+            unified[col] = default_val
+        if isinstance(default_val, str):
+            unified[col] = unified[col].astype(str).str.strip()
+        elif isinstance(default_val, float):
+            unified[col] = pd.to_numeric(unified[col], errors="coerce").fillna(default_val).astype(float)
+        elif isinstance(default_val, int):
+            unified[col] = pd.to_numeric(unified[col], errors="coerce").fillna(default_val).astype(int)
+    
+    return unified[list(UNIFIED_FORM_SCHEMA.keys())]
+
+def init_unified_forms():
+    """Initialize unified form system, migrating from old system if needed"""
+    if "unified_forms" not in ss:
+        # First time - migrate from old system
+        ss.unified_forms = migrate_to_unified_forms()
+        
+        # If migration resulted in empty dataframe, load defaults
+        if ss.unified_forms.empty:
+            ss.unified_forms = load_default_presets_unified()
+        
+        # Mark migration as complete
+        ss._forms_migrated = True
+    
+    # Ensure dataframe has correct structure
+    ss.unified_forms = ensure_cols(ss.unified_forms, UNIFIED_FORM_SCHEMA)
+
+def load_default_presets_unified() -> pd.DataFrame:
+    """Load default presets in unified format"""
+    # Built-in fallback data (Sharon's starter list)
+    fallback_data = [
+        {"Form": "Mug (12 oz)", "Clay_lb_wet": 0.90, "Default_glaze_g": 112, "Notes": "straight"},
+        {"Form": "Mug (14 oz)", "Clay_lb_wet": 1.00, "Default_glaze_g": 124, "Notes": ""},
+        {"Form": "Creamer (small)", "Clay_lb_wet": 0.75, "Default_glaze_g": 93, "Notes": ""},
+        {"Form": "Pitcher (medium)", "Clay_lb_wet": 2.50, "Default_glaze_g": 310, "Notes": ""},
+        {"Form": "Bowl (cereal)", "Clay_lb_wet": 1.25, "Default_glaze_g": 155, "Notes": "≈6\""},
+        {"Form": "Bowl (small)", "Clay_lb_wet": 1.00, "Default_glaze_g": 124, "Notes": ""},
+        {"Form": "Bowl (medium)", "Clay_lb_wet": 2.00, "Default_glaze_g": 248, "Notes": ""},
+        {"Form": "Bowl (large)", "Clay_lb_wet": 4.50, "Default_glaze_g": 558, "Notes": ""},
+        {"Form": "Plate (10 in dinner)", "Clay_lb_wet": 2.50, "Default_glaze_g": 310, "Notes": ""},
+        {"Form": "Pie plate", "Clay_lb_wet": 3.25, "Default_glaze_g": 403, "Notes": "3¼–3½ lb"},
+        {"Form": "Sugar jar", "Clay_lb_wet": 1.00, "Default_glaze_g": 124, "Notes": ""},
+        {"Form": "Honey jar", "Clay_lb_wet": 1.25, "Default_glaze_g": 155, "Notes": ""},
+        {"Form": "Crock (small)", "Clay_lb_wet": 1.75, "Default_glaze_g": 218, "Notes": ""},
+        {"Form": "Crock (medium)", "Clay_lb_wet": 3.00, "Default_glaze_g": 372, "Notes": ""},
+        {"Form": "Crock (large)", "Clay_lb_wet": 4.00, "Default_glaze_g": 496, "Notes": ""},
+    ]
+    
+    unified = pd.DataFrame(columns=list(UNIFIED_FORM_SCHEMA.keys()))
+    
+    for preset in fallback_data:
+        new_row = {
+            "Form": str(preset.get("Form", "")).strip(),
+            "Clay_lb_wet": float(preset.get("Clay_lb_wet", 0.0)),
+            "Default_glaze_g": float(preset.get("Default_glaze_g", 0.0)),
+            "Throwing_min": 0.0,  # Default timing - users can customize
+            "Trimming_min": 0.0,
+            "Handling_min": 0.0,
+            "Glazing_min": 6.0,  # Default 6 min glazing
+            "Pieces_per_shelf": 12,  # Default shelf capacity
+            "Notes": str(preset.get("Notes", "")).strip()
+        }
+        unified = pd.concat([unified, pd.DataFrame([new_row])], ignore_index=True)
+    
+    return ensure_cols(unified, UNIFIED_FORM_SCHEMA)
+
+# Initialize unified form system
+init_unified_forms()
 def apply_quick_defaults():
     """Apply sensible defaults for quick start mode."""
     defaults = {
@@ -824,34 +1024,9 @@ if "other_mat_df" not in ss:
     ss.other_mat_df = pd.DataFrame([
         {"Item":"","Unit":"","Cost_per_unit":0.0,"Quantity_for_project":0.0},
     ])
-if "production_forms" not in ss:
-    # Built-in production data based on Al's real studio
-    ss.production_forms = pd.DataFrame([
-        {
-            "Form": "Mug (12 oz)",
-            "Throwing_min": 3.33,    # 18 per hour
-            "Trimming_min": 3.33,    # 18 per hour (if trimming)
-            "Handling_min": 6.67,    # 2 hours for 18 mugs  
-            "Glazing_min": 6.0,      # 6 min per mug
-            "Pieces_per_shelf": 20,  # Al's corrected number
-            "Notes": "Al's no-trim straight mugs"
-        },
-        {
-            "Form": "Bowl (cereal)",
-            "Throwing_min": 5.0,     # 1 shelf per hour, 12 per shelf
-            "Trimming_min": 3.33,    # Same rate as mugs
-            "Handling_min": 0.0,     # No handling for bowls
-            "Glazing_min": 6.0,      # Same as mugs
-            "Pieces_per_shelf": 12,  # Al's corrected number
-            "Notes": "Standard cereal bowl"
-        }
-    ])
 
-if "custom_forms" not in ss:
-    # User's custom forms
-    ss.custom_forms = pd.DataFrame(columns=[
-        "Form", "Throwing_min", "Trimming_min", "Handling_min", "Glazing_min", "Pieces_per_shelf", "Notes"
-    ])
+# Initialize unified form system (replaces old separate form databases)
+init_unified_forms()
     
 # ------------ Glaze helpers ------------
 def glaze_cost_from_piece_table(df):
@@ -965,24 +1140,34 @@ def calc_totals(ip, glaze_per_piece_cost, other_pp: float = 0.0):
     )
 st.title("Pottery Cost Analysis App")
 
+# Initialize unified form system (replaces old separate form databases)
+try:
+    init_unified_forms()
+    st.write(f"✅ Unified forms initialized: {len(ss.unified_forms)} forms loaded")
+except Exception as e:
+    st.error(f"❌ Failed to initialize unified forms: {e}")
+    # Fallback - create empty unified forms
+    if "unified_forms" not in ss:
+        ss.unified_forms = pd.DataFrame(columns=list(UNIFIED_FORM_SCHEMA.keys()))
+
 tab_titles = [
-    "Quick Start",
-    "Per Unit", 
-    "Glaze Recipe",
-    "Energy",
-    "Production Planning",  # NEW TAB
-    "Labor and Overhead",
-    "Pricing",
-    "Save and Load", 
-    "Shipping & Tariffs",
-    "Report",
-    "About",
+    "Quick Start",      # 0
+    "Per Unit",         # 1
+    "Glaze Recipe",     # 2
+    "Energy",           # 3
+    "Production Planning",  # 4
+    "Labor and Overhead",   # 5
+    "Pricing",              # 6
+    "Save and Load",        # 7
+    "Shipping & Tariffs",   # 8
+    "Report",               # 9
+    "About",                # 10
 ]
 tabs = st.tabs(tab_titles)
 
 # ------------- Quick Start Tab (POLISHED) -------------
 with tabs[0]:
-    st.header("🎯 Quick Price Calculator")
+    st.header("🎯 Quick Start")
     st.markdown("**Get pricing for your pottery in under 2 minutes**")
     
     # Apply defaults
@@ -998,12 +1183,12 @@ with tabs[0]:
     with left_col:
         st.subheader("1. What are you making?")
         
-        # Form selector using existing presets
-        init_form_presets_in_state()  # Make sure presets are loaded
-        presets_df = ss.form_presets_df.copy()
+        # Form selector using unified form database
+        init_unified_forms()  # Ensure unified forms are loaded
+        unified_forms = ss.unified_forms.copy()
         
         # Get popular forms (first 20 or so)
-        popular_forms = presets_df.head(20)["Form"].tolist() if not presets_df.empty else []
+        popular_forms = unified_forms.head(20)["Form"].tolist() if not unified_forms.empty else []
         
         selected_form = st.selectbox(
             "Choose a form:",
@@ -1017,8 +1202,8 @@ with tabs[0]:
         glaze_amount = 80
         confidence_factors = {"form": False}
         
-        if selected_form != "Custom" and not presets_df.empty:
-            preset_row = presets_df.loc[presets_df["Form"] == selected_form].iloc[0]
+        if selected_form != "Custom" and not unified_forms.empty:
+            preset_row = unified_forms.loc[unified_forms["Form"] == selected_form].iloc[0]
             preset_clay_lb = float(preset_row.get("Clay_lb_wet", 1.0))
             preset_glaze_g = float(preset_row.get("Default_glaze_g", 80))
             
@@ -1310,99 +1495,117 @@ with tabs[1]:
     # Left column
     # =========================
     with left:
-        # ---------- Form preset picker + manager ----------
-        
+        #  ---------- Form preset picker + manager ----------
         
         st.subheader("Form preset")
 
-        # Safe copy of presets table (created by init_form_presets_in_state)
-        presets_df = ss.form_presets_df.copy()
+        # Use unified forms database
+        unified_forms = ss.unified_forms.copy()
 
         # Dropdown of forms
-        forms = list(presets_df["Form"]) if not presets_df.empty else []
+        forms = list(unified_forms["Form"]) if not unified_forms.empty else []
         choice = st.selectbox("Choose a form", ["None"] + forms, index=0, key="form_choice")
 
         # Preview & apply
-        if choice != "None" and not presets_df.empty:
-            row = presets_df.loc[presets_df["Form"] == choice].iloc[0]
+        if choice != "None" and not unified_forms.empty:
+            row = unified_forms.loc[unified_forms["Form"] == choice].iloc[0]
             preset_clay_lb = float(row.get("Clay_lb_wet", 0.0))
             preset_glaze_g = float(row.get("Default_glaze_g", 0.0))
+            preset_throwing_min = float(row.get("Throwing_min", 0.0))
+            preset_glazing_min = float(row.get("Glazing_min", 0.0))
             note = str(row.get("Notes", "")).strip()
 
-            c1, c2, c3 = st.columns([1, 1, 2])
-            c1.metric("Preset clay", f"{preset_clay_lb:.2f} lb")
-            c2.metric("Preset glaze", f"{preset_glaze_g:.0f} g")
+            c1, c2, c3, c4 = st.columns([1, 1, 1, 2])
+            c1.metric("Clay", f"{preset_clay_lb:.2f} lb")
+            c2.metric("Glaze", f"{preset_glaze_g:.0f} g")
+            if preset_throwing_min > 0:
+                c3.metric("Throwing", f"{preset_throwing_min:.1f} min")
+            if preset_glazing_min > 0:
+                c4.metric("Glazing", f"{preset_glazing_min:.1f} min")
             if note:
-                c3.caption(note)
+                st.caption(f"💡 {note}")
 
             if st.button("Use this preset", key="apply_preset_btn"):
                 ip["clay_weight_per_piece_lb"] = preset_clay_lb
                 ss.recipe_grams_per_piece = preset_glaze_g
-                st.success("Preset applied to clay weight and glaze grams per piece.")
+                if preset_throwing_min > 0:
+                    # Also update labor hours if timing data exists
+                    total_time_hours = (preset_throwing_min + preset_glazing_min) / 60.0
+                    if total_time_hours > 0:
+                        ip["hours_per_piece"] = total_time_hours
+                st.success("Preset applied to clay weight, glaze amount, and labor time.")
 
         # Manage presets
-        with st.expander("Manage presets (CSV import/export, inline edit)"):
-            st.caption("Columns must be: Form, Clay_lb_wet, Default_glaze_g, Notes")
+        with st.expander("Manage unified forms (CSV import/export, inline edit)"):
+            st.caption("Unified form database includes clay weight, glaze amount, timing data, and kiln info")
 
-            # Export current presets
-            _csv_bytes = ss.form_presets_df.to_csv(index=False).encode("utf-8")
+            # Export current unified forms
+            _csv_bytes = ss.unified_forms.to_csv(index=False).encode("utf-8")
             st.download_button(
-                "Download presets CSV",
+                "Download unified forms CSV",
                 _csv_bytes,
-                file_name="form_presets.csv",
+                file_name="unified_forms.csv",
                 mime="text/csv",
-                key="dl_presets_csv",
+                key="dl_unified_csv",
             )
 
-            # Upload new presets
+            # Upload new forms
             u1, u2 = st.columns([1, 1])
             with u1:
                 upload_mode = st.radio(
                     "When uploading",
                     ["Replace", "Append"],
                     horizontal=True,
-                    key="presets_upload_mode",
+                    key="unified_upload_mode",
                 )
             with u2:
-                up = st.file_uploader("Upload presets CSV", type=["csv"], key="presets_csv_uploader")
+                up = st.file_uploader("Upload unified forms CSV", type=["csv"], key="unified_csv_uploader")
 
             if up is not None:
                 try:
                     new_df = pd.read_csv(up)
-                    # normalize
-                    for c in ["Form", "Clay_lb_wet", "Default_glaze_g", "Notes"]:
-                        if c not in new_df.columns:
-                            new_df[c] = "" if c in ("Form", "Notes") else 0.0
-                    new_df = new_df[["Form", "Clay_lb_wet", "Default_glaze_g", "Notes"]].copy()
-                    new_df["Form"] = new_df["Form"].astype(str).str.strip()
-                    new_df["Clay_lb_wet"] = pd.to_numeric(new_df["Clay_lb_wet"], errors="coerce").fillna(0.0)
-                    new_df["Default_glaze_g"] = pd.to_numeric(new_df["Default_glaze_g"], errors="coerce").fillna(0.0)
+                    # Ensure all required columns exist
+                    new_df = ensure_cols(new_df, UNIFIED_FORM_SCHEMA)
+                    
+                    # Clean and validate data
+                    for col, default_val in UNIFIED_FORM_SCHEMA.items():
+                        if isinstance(default_val, str):
+                            new_df[col] = new_df[col].astype(str).str.strip()
+                        elif isinstance(default_val, float):
+                            new_df[col] = pd.to_numeric(new_df[col], errors="coerce").fillna(default_val)
+                        elif isinstance(default_val, int):
+                            new_df[col] = pd.to_numeric(new_df[col], errors="coerce").fillna(default_val).astype(int)
 
                     if upload_mode == "Replace":
-                        ss.form_presets_df = new_df
+                        ss.unified_forms = new_df
                     else:
-                        base = ss.form_presets_df.copy()
+                        base = ss.unified_forms.copy()
                         combo = pd.concat([base, new_df], ignore_index=True)
-                        ss.form_presets_df = combo.drop_duplicates(subset=["Form"], keep="last").reset_index(drop=True)
+                        ss.unified_forms = combo.drop_duplicates(subset=["Form"], keep="last").reset_index(drop=True)
 
-                    st.success(f"Loaded {len(new_df)} presets.")
+                    st.success(f"Loaded {len(new_df)} unified forms.")
                 except Exception as e:
                     st.error(f"Could not read CSV. {e}")
 
-            st.caption("Edit rows below (add/delete allowed).")
+            st.caption("Edit rows below (add/delete allowed). All form data in one place!")
             edited = st.data_editor(
-                ss.form_presets_df,
+                ss.unified_forms,
                 column_config={
                     "Form": st.column_config.TextColumn("Form"),
-                    "Clay_lb_wet": st.column_config.NumberColumn("Clay (lb, wet)", min_value=0.0, step=0.05),
-                    "Default_glaze_g": st.column_config.NumberColumn("Default glaze (g)", min_value=0.0, step=1.0),
+                    "Clay_lb_wet": st.column_config.NumberColumn("Clay (lb)", min_value=0.0, step=0.05),
+                    "Default_glaze_g": st.column_config.NumberColumn("Glaze (g)", min_value=0.0, step=1.0),
+                    "Throwing_min": st.column_config.NumberColumn("Throwing (min)", min_value=0.0, step=0.1),
+                    "Trimming_min": st.column_config.NumberColumn("Trimming (min)", min_value=0.0, step=0.1),
+                    "Handling_min": st.column_config.NumberColumn("Handling (min)", min_value=0.0, step=0.1),
+                    "Glazing_min": st.column_config.NumberColumn("Glazing (min)", min_value=0.0, step=0.1),
+                    "Pieces_per_shelf": st.column_config.NumberColumn("Per shelf", min_value=0, step=1),
                     "Notes": st.column_config.TextColumn("Notes"),
                 },
                 num_rows="dynamic",
                 use_container_width=True,
-                key="form_presets_editor",
+                key="unified_forms_editor",
             )
-            ss.form_presets_df = edited.copy()
+            ss.unified_forms = edited.copy()
             
 
         # ---------- Clay & packaging ----------
@@ -1523,16 +1726,40 @@ with tabs[1]:
             wet_gallery_needed = (fired_rim_od + clearance) / max(1e-9, (1.0 - rate))
             l3.metric("Wet gallery inner diameter to throw", f"{wet_gallery_needed:.3f} {u}")
 
+            # Gallery height calculation
+            st.caption("Gallery height for proportional lid design")
+            h1, h2 = st.columns([1, 1])
+            desired_gallery_depth = h1.number_input(
+                f"Desired fired gallery depth ({u})",
+                min_value=0.0,
+                value=float(ss.get("lid_desired_depth", 0.25 if u == "in" else 6.0 if u == "mm" else 0.6)),
+                step=0.001,
+                key="lid_desired_depth",
+                help="How deep you want the lid to sit on the pot"
+            )
+            wet_gallery_height = desired_gallery_depth / max(1e-9, (1.0 - rate))
+            h2.metric("Wet gallery height to throw", f"{wet_gallery_height:.3f} {u}")
+
             st.caption("Reverse check if you already threw a lid")
-            lid_wet_id = st.number_input(
+            rev1, rev2 = st.columns([1, 1])
+            lid_wet_id = rev1.number_input(
                 f"Wet gallery inner diameter you threw ({u})",
                 min_value=0.0,
                 value=float(ss.get("lid_wet_id", wet_gallery_needed)),
                 step=0.001,
                 key="lid_wet_id",
             )
+            lid_wet_height = rev2.number_input(
+                f"Wet gallery height you threw ({u})",
+                min_value=0.0,
+                value=float(ss.get("lid_wet_height", wet_gallery_height)),
+                step=0.001,
+                key="lid_wet_height",
+            )
             expected_fired_id = lid_wet_id * (1.0 - rate)
+            expected_fired_height = lid_wet_height * (1.0 - rate)
             st.write(f"Expected fired gallery inner diameter: **{expected_fired_id:.3f} {u}**")
+            st.write(f"Expected fired gallery depth: **{expected_fired_height:.3f} {u}**")
            
 
         # ---------- Glaze source ----------
@@ -2194,45 +2421,48 @@ with tabs[3]:
     else:
         st.caption("💡 Set your firing costs above to see energy cost per piece")
 
-with tabs[4]:  # Adjust index based on where you insert it
+with tabs[4]:  # Production Planning tab
     st.header("🏭 Production Planning")
     st.markdown("**Plan your pottery production with real studio workflow**")
     
     # FORM SELECTION
     st.subheader("1. What are you making?")
     
-    # Get all available forms
-    builtin_forms = list(ss.production_forms["Form"]) if not ss.production_forms.empty else []
-    custom_forms = list(ss.custom_forms["Form"]) if not ss.custom_forms.empty else []
-    all_forms = builtin_forms + custom_forms + ["➕ Add Custom Form"]
+    # Get all available forms from unified database
+    unified_forms = ss.unified_forms.copy()
+    available_forms = list(unified_forms["Form"]) if not unified_forms.empty else []
     
     selected_form = st.selectbox(
         "Choose form type:",
-        all_forms,
-        help="Select from built-in forms or add your custom form with timing"
+        ["None"] + available_forms + ["➕ Add New Form"],
+        help="Select from your unified form database or add a new form with timing"
     )
     
-    # CUSTOM FORM ENTRY
-    if selected_form == "➕ Add Custom Form":
-        st.markdown("**Create custom form with your timing**")
+    # ADD NEW FORM TO UNIFIED DATABASE
+    if selected_form == "➕ Add New Form":
+        st.markdown("**Add new form to unified database**")
         
-        with st.expander("Add new custom form", expanded=True):
-            custom_col1, custom_col2 = st.columns(2)
+        with st.expander("Add new form with complete data", expanded=True):
+            new_col1, new_col2 = st.columns(2)
             
-            with custom_col1:
+            with new_col1:
                 new_form_name = st.text_input("Form name (e.g., 'Large Vase', 'Dinner Plate')")
+                new_clay_lb = st.number_input("Clay weight (lb wet)", min_value=0.0, step=0.1, value=1.0)
+                new_glaze_g = st.number_input("Glaze amount (grams)", min_value=0.0, step=1.0, value=100.0)
                 new_throwing = st.number_input("Throwing time (minutes per piece)", min_value=0.0, step=0.1, value=5.0)
                 new_trimming = st.number_input("Trimming time (minutes per piece)", min_value=0.0, step=0.1, value=0.0)
-                new_handling = st.number_input("Handling time (minutes per piece)", min_value=0.0, step=0.1, value=0.0)
             
-            with custom_col2:
+            with new_col2:
+                new_handling = st.number_input("Handling time (minutes per piece)", min_value=0.0, step=0.1, value=0.0)
                 new_glazing = st.number_input("Glazing time (minutes per piece)", min_value=0.0, step=0.1, value=6.0)
-                new_pieces_shelf = st.number_input("Pieces per kiln shelf", min_value=1, step=1, value=10)
+                new_pieces_shelf = st.number_input("Pieces per kiln shelf", min_value=1, step=1, value=12)
                 new_notes = st.text_input("Notes (optional)")
             
-            if st.button("Add Custom Form") and new_form_name.strip():
-                new_custom = pd.DataFrame([{
+            if st.button("Add New Form to Database") and new_form_name.strip():
+                new_unified_form = pd.DataFrame([{
                     "Form": new_form_name.strip(),
+                    "Clay_lb_wet": new_clay_lb,
+                    "Default_glaze_g": new_glaze_g,
                     "Throwing_min": new_throwing,
                     "Trimming_min": new_trimming, 
                     "Handling_min": new_handling,
@@ -2241,21 +2471,17 @@ with tabs[4]:  # Adjust index based on where you insert it
                     "Notes": new_notes
                 }])
                 
-                if ss.custom_forms.empty:
-                    ss.custom_forms = new_custom
-                else:
-                    ss.custom_forms = pd.concat([ss.custom_forms, new_custom], ignore_index=True)
+                # Remove existing form with same name, then add new one
+                ss.unified_forms = ss.unified_forms[ss.unified_forms["Form"] != new_form_name.strip()]
+                ss.unified_forms = pd.concat([ss.unified_forms, new_unified_form], ignore_index=True)
                 
-                st.success(f"Added {new_form_name}!")
+                st.success(f"Added {new_form_name} to unified form database!")
                 st.rerun()
     
     # PRODUCTION CALCULATION  
-    if selected_form not in ["➕ Add Custom Form"] and selected_form:
-        # Get form data
-        if selected_form in builtin_forms:
-            form_data = ss.production_forms[ss.production_forms["Form"] == selected_form].iloc[0]
-        else:
-            form_data = ss.custom_forms[ss.custom_forms["Form"] == selected_form].iloc[0]
+    if selected_form not in ["None", "➕ Add New Form"] and selected_form:
+        # Get form data from unified database
+        form_data = unified_forms[unified_forms["Form"] == selected_form].iloc[0]
         
         # Display form info
         st.markdown(f"**Selected: {selected_form}**")
@@ -2265,6 +2491,12 @@ with tabs[4]:  # Adjust index based on where you insert it
         info_col2.metric("Trimming", f"{form_data['Trimming_min']:.1f} min")
         info_col3.metric("Handling", f"{form_data['Handling_min']:.1f} min") 
         info_col4.metric("Glazing", f"{form_data['Glazing_min']:.1f} min")
+        
+        # Show clay and glaze data too
+        detail_col1, detail_col2, detail_col3 = st.columns(3)
+        detail_col1.metric("Clay weight", f"{form_data['Clay_lb_wet']:.2f} lb")
+        detail_col2.metric("Glaze amount", f"{form_data['Default_glaze_g']:.0f} g")
+        detail_col3.metric("Per shelf", f"{int(form_data['Pieces_per_shelf'])} pcs")
         
         if form_data["Notes"]:
             st.caption(f"💡 {form_data['Notes']}")
@@ -2358,59 +2590,42 @@ with tabs[4]:  # Adjust index based on where you insert it
         big_col2.metric("Hands-on labor", f"{hands_on_hours + kiln_loading_hours:.1f} hours")
         big_col3.metric("Ready date", delivery_date.strftime("%B %d, %Y"))
         
-        # DETAILED BREAKDOWN
-        with st.expander("🔍 Detailed process breakdown", expanded=False):
-            st.markdown("**Step-by-step timeline:**")
-            current_time = 0
-            
-            st.write(f"Day 0: Start throwing ({throwing_total/60:.1f} hours)")
-            current_time += throwing_total/60
-            
-            if do_trimming:
-                st.write(f"Day {current_time/24:.1f}: Start trimming ({trimming_total/60:.1f} hours)")
-                current_time += trimming_total/60
-            
-            if handling_total > 0:
-                st.write(f"Day {current_time/24:.1f}: Handling work ({handling_total/60:.1f} hours)")
-                current_time += handling_total/60
-            
-            st.write(f"Day {current_time/24:.1f}: Final drying begins (12 hours)")
-            current_time += 12
-            
-            for load in range(kiln_loads_needed):
-                st.write(f"Day {current_time/24:.1f}: Bisque load {load+1} (1h load + 20h fire/cool)")
-                current_time += 21
-            
-            st.write(f"Day {current_time/24:.1f}: Start glazing ({glazing_total/60:.1f} hours)")
-            current_time += glazing_total/60
-            
-            for load in range(kiln_loads_needed):
-                st.write(f"Day {current_time/24:.1f}: Glaze load {load+1} (1h load + 92h fire/cool)")
-                current_time += 93
-            
-            st.write(f"**Day {current_time/24:.1f}: Order complete!**")
+        # COST INTEGRATION (NEW!)
+        st.markdown("---")
+        st.subheader("💰 Cost for this order")
         
-        # CAPACITY INSIGHTS
-        with st.expander("📊 Production insights", expanded=False):
-            pieces_per_hour = 60 / form_data["Throwing_min"]
-            weekly_capacity = pieces_per_hour * 40  # 40 hour work week
-            
-            st.write(f"• You can throw {pieces_per_hour:.1f} {selected_form.lower()} per hour")
-            st.write(f"• Weekly throwing capacity: ~{weekly_capacity:.0f} pieces")
-            st.write(f"• This order uses {(hands_on_hours + kiln_loading_hours)/40*100:.1f}% of a work week")
-            
-            if kiln_loads_needed > 1:
-                st.write(f"• Consider batching: {kiln_loads_needed} separate firings needed")
-            
-            bottleneck = max(
-                ("Throwing", throwing_total),
-                ("Trimming", trimming_total) if do_trimming else ("Trimming", 0),
-                ("Handling", handling_total),
-                ("Glazing", glazing_total)
-            )
-            
-            if bottleneck[1] > 0:
-                st.write(f"• Time bottleneck: {bottleneck[0]} takes {bottleneck[1]/60:.1f} hours")
+        # Calculate costs using unified form data
+        clay_weight_total = quantity * form_data["Clay_lb_wet"]
+        glaze_grams_total = quantity * form_data["Default_glaze_g"]
+        labor_hours_total = hands_on_hours + kiln_loading_hours
+        
+        cost_col1, cost_col2, cost_col3 = st.columns(3)
+        cost_col1.metric("Total clay needed", f"{clay_weight_total:.1f} lb")
+        cost_col2.metric("Total glaze needed", f"{glaze_grams_total:.0f} g")
+        cost_col3.metric("Total labor hours", f"{labor_hours_total:.1f} hrs")
+        
+        # Use current cost settings to estimate order cost
+        clay_cost_per_lb = ss.inputs["clay_price_per_bag"] / ss.inputs["clay_bag_weight_lb"] if ss.inputs["clay_bag_weight_lb"] else 0.0
+        total_clay_cost = (clay_weight_total / ss.inputs.get("clay_yield", 0.9)) * clay_cost_per_lb
+        total_labor_cost = labor_hours_total * ss.inputs.get("labor_rate", 15.0)
+        
+        st.write(f"**Estimated order costs:**")
+        st.write(f"• Clay: {money(total_clay_cost)}")
+        st.write(f"• Labor: {money(total_labor_cost)}")
+        st.write(f"• **Subtotal: {money(total_clay_cost + total_labor_cost)}** (excludes glaze, energy, overhead)")
+        
+        # QUICK APPLY TO COST CALCULATOR
+        if st.button("📊 Use this form in cost calculator"):
+            ss.inputs["clay_weight_per_piece_lb"] = form_data["Clay_lb_wet"]
+            ss.recipe_grams_per_piece = form_data["Default_glaze_g"]
+            total_time_hours = (form_data["Throwing_min"] + form_data["Trimming_min"] + 
+                              form_data["Handling_min"] + form_data["Glazing_min"]) / 60.0
+            if total_time_hours > 0:
+                ss.inputs["hours_per_piece"] = total_time_hours
+            st.success("✅ Applied form data to cost calculator! Check the 'Per Unit' and 'Pricing' tabs.")
+    
+    else:
+        st.info("👆 Select a form above to see production planning and cost estimates.")
                 
 # ------------ Labor and overhead ------------
 with tabs[5]:
@@ -2656,7 +2871,7 @@ with tabs[tab_titles.index("Shipping & Tariffs")]:
     
 
 # ------------ Save and load ------------
-with tabs[7]:
+with tabs[8]:
     
     st.subheader("Save and load settings")
     state = dict(
@@ -2666,8 +2881,10 @@ with tabs[7]:
         recipe_df=ensure_cols(ss.recipe_df, {"Material": "", "Percent": 0.0}).to_dict(orient="list"),
         recipe_grams_per_piece=ss.recipe_grams_per_piece,
         other_mat_df=ensure_cols(ss.other_mat_df, {"Item":"", "Unit":"", "Cost_per_unit":0.0, "Quantity_for_project":0.0}).to_dict(orient="list"),
+        unified_forms=ensure_cols(ss.unified_forms, UNIFIED_FORM_SCHEMA).to_dict(orient="list"),
     )
     st.download_button("Download settings JSON", to_json_bytes(state), file_name="pottery_pricing_settings.json")
+    
     up = st.file_uploader("Upload settings JSON", type=["json"])
     if up is not None:
         try:
@@ -2687,11 +2904,59 @@ with tabs[7]:
             ss.catalog_df = dict_to_df(data.get("catalog_df", {}), ["Material", "Cost_per_lb", "Cost_per_kg"])
             ss.recipe_df = dict_to_df(data.get("recipe_df", {}), ["Material", "Percent"])
             ss.other_mat_df = dict_to_df(data.get("other_mat_df", {}), ["Item","Unit","Cost_per_unit","Quantity_for_project"])
+            
+            # Handle unified forms
+            if "unified_forms" in data:
+                ss.unified_forms = dict_to_df(data["unified_forms"], list(UNIFIED_FORM_SCHEMA.keys()))
+                ss.unified_forms = ensure_cols(ss.unified_forms, UNIFIED_FORM_SCHEMA)
+            else:
+                # Backward compatibility - migrate from old format if present
+                if any(key in data for key in ["form_presets_df", "production_forms", "custom_forms"]):
+                    # Temporarily load old data to session state for migration
+                    old_presets = dict_to_df(data.get("form_presets_df", {}), ["Form", "Clay_lb_wet", "Default_glaze_g", "Notes"])
+                    old_production = dict_to_df(data.get("production_forms", {}), ["Form", "Throwing_min", "Trimming_min", "Handling_min", "Glazing_min", "Pieces_per_shelf", "Notes"])
+                    old_custom = dict_to_df(data.get("custom_forms", {}), ["Form", "Throwing_min", "Trimming_min", "Handling_min", "Glazing_min", "Pieces_per_shelf", "Notes"])
+                    
+                    # Store temporarily
+                    ss.form_presets_df = old_presets
+                    ss.production_forms = old_production  
+                    ss.custom_forms = old_custom
+                    
+                    # Migrate to unified
+                    ss.unified_forms = migrate_to_unified_forms()
+                    st.info("✨ Migrated your old form data to new unified system!")
+                else:
+                    # No form data in file, keep current
+                    pass
+            
             ss.recipe_grams_per_piece = float(data.get("recipe_grams_per_piece", ss.recipe_grams_per_piece))
-            st.success("Loaded")
+            st.success("✅ Settings loaded successfully!")
+            
         except Exception as e:
-            st.error(f"Could not load. {e}")
+            st.error(f"Could not load settings. {e}")
 
+    # Show current unified forms status
+    with st.expander("📊 Current unified forms database", expanded=False):
+        st.caption(f"You have {len(ss.unified_forms)} forms in your unified database")
+        if not ss.unified_forms.empty:
+            # Show summary
+            has_clay = (ss.unified_forms["Clay_lb_wet"] > 0).sum()
+            has_glaze = (ss.unified_forms["Default_glaze_g"] > 0).sum()
+            has_timing = (ss.unified_forms["Throwing_min"] > 0).sum()
+            
+            summary_col1, summary_col2, summary_col3 = st.columns(3)
+            summary_col1.metric("Forms with clay data", has_clay)
+            summary_col2.metric("Forms with glaze data", has_glaze) 
+            summary_col3.metric("Forms with timing data", has_timing)
+            
+            # Option to export unified forms separately
+            unified_csv = ss.unified_forms.to_csv(index=False).encode("utf-8")
+            st.download_button(
+                "📄 Export unified forms as CSV",
+                unified_csv,
+                file_name="unified_forms_export.csv",
+                mime="text/csv"
+            )
         
          
 
