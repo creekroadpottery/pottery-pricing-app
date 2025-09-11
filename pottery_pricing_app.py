@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import json
@@ -652,6 +653,7 @@ def init_form_presets_in_state():
     if "Notes" not in ss.form_presets_df.columns:
         ss.form_presets_df["Notes"] = ""
 
+
 # ---------- Preset categorizer ----------
 CATEGORY_ORDER = [
     "Mugs and cups",          # most common first
@@ -822,7 +824,35 @@ if "other_mat_df" not in ss:
     ss.other_mat_df = pd.DataFrame([
         {"Item":"","Unit":"","Cost_per_unit":0.0,"Quantity_for_project":0.0},
     ])
+if "production_forms" not in ss:
+    # Built-in production data based on Al's real studio
+    ss.production_forms = pd.DataFrame([
+        {
+            "Form": "Mug (12 oz)",
+            "Throwing_min": 3.33,    # 18 per hour
+            "Trimming_min": 3.33,    # 18 per hour (if trimming)
+            "Handling_min": 6.67,    # 2 hours for 18 mugs  
+            "Glazing_min": 6.0,      # 6 min per mug
+            "Pieces_per_shelf": 20,  # Al's corrected number
+            "Notes": "Al's no-trim straight mugs"
+        },
+        {
+            "Form": "Bowl (cereal)",
+            "Throwing_min": 5.0,     # 1 shelf per hour, 12 per shelf
+            "Trimming_min": 3.33,    # Same rate as mugs
+            "Handling_min": 0.0,     # No handling for bowls
+            "Glazing_min": 6.0,      # Same as mugs
+            "Pieces_per_shelf": 12,  # Al's corrected number
+            "Notes": "Standard cereal bowl"
+        }
+    ])
 
+if "custom_forms" not in ss:
+    # User's custom forms
+    ss.custom_forms = pd.DataFrame(columns=[
+        "Form", "Throwing_min", "Trimming_min", "Handling_min", "Glazing_min", "Pieces_per_shelf", "Notes"
+    ])
+    
 # ------------ Glaze helpers ------------
 def glaze_cost_from_piece_table(df):
     gdf = ensure_cols(df, {"Material": "", "Cost_per_lb": 0.0, "Grams_per_piece": 0.0}).copy()
@@ -936,13 +966,14 @@ def calc_totals(ip, glaze_per_piece_cost, other_pp: float = 0.0):
 st.title("Pottery Cost Analysis App")
 
 tab_titles = [
-    "Quick Start",      # NEW - becomes tab 0
-    "Per Unit",         # existing tabs shift to 1, 2, 3...
+    "Quick Start",
+    "Per Unit", 
     "Glaze Recipe",
-    "Energy", 
+    "Energy",
+    "Production Planning",  # NEW TAB
     "Labor and Overhead",
     "Pricing",
-    "Save and Load",
+    "Save and Load", 
     "Shipping & Tariffs",
     "Report",
     "About",
@@ -2163,8 +2194,226 @@ with tabs[3]:
     else:
         st.caption("💡 Set your firing costs above to see energy cost per piece")
 
+with tabs[4]:  # Adjust index based on where you insert it
+    st.header("🏭 Production Planning")
+    st.markdown("**Plan your pottery production with real studio workflow**")
+    
+    # FORM SELECTION
+    st.subheader("1. What are you making?")
+    
+    # Get all available forms
+    builtin_forms = list(ss.production_forms["Form"]) if not ss.production_forms.empty else []
+    custom_forms = list(ss.custom_forms["Form"]) if not ss.custom_forms.empty else []
+    all_forms = builtin_forms + custom_forms + ["➕ Add Custom Form"]
+    
+    selected_form = st.selectbox(
+        "Choose form type:",
+        all_forms,
+        help="Select from built-in forms or add your custom form with timing"
+    )
+    
+    # CUSTOM FORM ENTRY
+    if selected_form == "➕ Add Custom Form":
+        st.markdown("**Create custom form with your timing**")
+        
+        with st.expander("Add new custom form", expanded=True):
+            custom_col1, custom_col2 = st.columns(2)
+            
+            with custom_col1:
+                new_form_name = st.text_input("Form name (e.g., 'Large Vase', 'Dinner Plate')")
+                new_throwing = st.number_input("Throwing time (minutes per piece)", min_value=0.0, step=0.1, value=5.0)
+                new_trimming = st.number_input("Trimming time (minutes per piece)", min_value=0.0, step=0.1, value=0.0)
+                new_handling = st.number_input("Handling time (minutes per piece)", min_value=0.0, step=0.1, value=0.0)
+            
+            with custom_col2:
+                new_glazing = st.number_input("Glazing time (minutes per piece)", min_value=0.0, step=0.1, value=6.0)
+                new_pieces_shelf = st.number_input("Pieces per kiln shelf", min_value=1, step=1, value=10)
+                new_notes = st.text_input("Notes (optional)")
+            
+            if st.button("Add Custom Form") and new_form_name.strip():
+                new_custom = pd.DataFrame([{
+                    "Form": new_form_name.strip(),
+                    "Throwing_min": new_throwing,
+                    "Trimming_min": new_trimming, 
+                    "Handling_min": new_handling,
+                    "Glazing_min": new_glazing,
+                    "Pieces_per_shelf": new_pieces_shelf,
+                    "Notes": new_notes
+                }])
+                
+                if ss.custom_forms.empty:
+                    ss.custom_forms = new_custom
+                else:
+                    ss.custom_forms = pd.concat([ss.custom_forms, new_custom], ignore_index=True)
+                
+                st.success(f"Added {new_form_name}!")
+                st.rerun()
+    
+    # PRODUCTION CALCULATION  
+    if selected_form not in ["➕ Add Custom Form"] and selected_form:
+        # Get form data
+        if selected_form in builtin_forms:
+            form_data = ss.production_forms[ss.production_forms["Form"] == selected_form].iloc[0]
+        else:
+            form_data = ss.custom_forms[ss.custom_forms["Form"] == selected_form].iloc[0]
+        
+        # Display form info
+        st.markdown(f"**Selected: {selected_form}**")
+        
+        info_col1, info_col2, info_col3, info_col4 = st.columns(4)
+        info_col1.metric("Throwing", f"{form_data['Throwing_min']:.1f} min")
+        info_col2.metric("Trimming", f"{form_data['Trimming_min']:.1f} min")
+        info_col3.metric("Handling", f"{form_data['Handling_min']:.1f} min") 
+        info_col4.metric("Glazing", f"{form_data['Glazing_min']:.1f} min")
+        
+        if form_data["Notes"]:
+            st.caption(f"💡 {form_data['Notes']}")
+        
+        st.markdown("---")
+        
+        # ORDER DETAILS
+        st.subheader("2. Order details")
+        
+        order_col1, order_col2, order_col3 = st.columns(3)
+        
+        with order_col1:
+            quantity = st.number_input("Quantity to make", min_value=1, step=1, value=18)
+            
+        with order_col2:
+            trim_option = st.radio("Trimming?", ["No trim", "Trim all"], horizontal=True)
+            do_trimming = (trim_option == "Trim all")
+            
+        with order_col3:
+            start_date = st.date_input("Start date", value=_dt.date.today())
+        
+        # TIMELINE CALCULATION
+        st.subheader("3. Production timeline")
+        
+        # Calculate times
+        throwing_total = quantity * form_data["Throwing_min"]
+        trimming_total = quantity * form_data["Trimming_min"] if do_trimming else 0
+        handling_total = quantity * form_data["Handling_min"]
+        glazing_total = quantity * form_data["Glazing_min"]
+        
+        # Kiln calculations (using pieces per shelf and your 4-shelf kiln)
+        pieces_per_shelf = int(form_data["Pieces_per_shelf"])
+        pieces_per_kiln = pieces_per_shelf * 4  # 4 shelves
+        kiln_loads_needed = int((quantity + pieces_per_kiln - 1) // pieces_per_kiln)
+        
+        # Fixed process times (Al's data)
+        initial_drying_hours = 2
+        final_drying_hours = 12
+        bisque_fire_hours = 8
+        bisque_cool_hours = 12
+        glaze_fire_hours = 8
+        glaze_cool_hours = 84  # 3.5 days as requested
+        loading_hours_per_kiln = 1
+        
+        # Calculate total calendar time
+        hands_on_hours = (throwing_total + trimming_total + handling_total + glazing_total) / 60
+        kiln_loading_hours = kiln_loads_needed * loading_hours_per_kiln * 2  # bisque + glaze loading
+        
+        # Calendar time calculation
+        process_hours = (
+            initial_drying_hours +
+            final_drying_hours + 
+            (bisque_fire_hours + bisque_cool_hours) * kiln_loads_needed +
+            (glaze_fire_hours + glaze_cool_hours) * kiln_loads_needed
+        )
+        
+        total_calendar_days = (hands_on_hours + kiln_loading_hours + process_hours) / 24
+        
+        # Results
+        result_col1, result_col2 = st.columns(2)
+        
+        with result_col1:
+            st.markdown("**⏱️ Hands-on time breakdown**")
+            st.write(f"• Throwing: {throwing_total/60:.1f} hours")
+            if do_trimming:
+                st.write(f"• Trimming: {trimming_total/60:.1f} hours")
+            if handling_total > 0:
+                st.write(f"• Handling: {handling_total/60:.1f} hours")
+            st.write(f"• Glazing: {glazing_total/60:.1f} hours")
+            st.write(f"• Kiln loading: {kiln_loading_hours:.1f} hours")
+            st.write(f"**Total hands-on: {hands_on_hours + kiln_loading_hours:.1f} hours**")
+        
+        with result_col2:
+            st.markdown("**🔥 Kiln schedule**")
+            st.write(f"• Kiln loads needed: {kiln_loads_needed}")
+            st.write(f"• Pieces per load: {pieces_per_kiln}")
+            st.write(f"• Bisque firing: {bisque_fire_hours}h fire + {bisque_cool_hours}h cool")
+            st.write(f"• Glaze firing: {glaze_fire_hours}h fire + {glaze_cool_hours}h cool")
+            st.write(f"**Total process time: {process_hours/24:.1f} days**")
+        
+        # DELIVERY ESTIMATE
+        import datetime as dt
+        
+        delivery_date = start_date + _dt.timedelta(days=int(total_calendar_days) + (1 if total_calendar_days != int(total_calendar_days) else 0))
+        
+        st.markdown("---")
+        st.subheader("📅 Delivery estimate")
+        
+        big_col1, big_col2, big_col3 = st.columns(3)
+        big_col1.metric("Total calendar time", f"{total_calendar_days:.1f} days")
+        big_col2.metric("Hands-on labor", f"{hands_on_hours + kiln_loading_hours:.1f} hours")
+        big_col3.metric("Ready date", delivery_date.strftime("%B %d, %Y"))
+        
+        # DETAILED BREAKDOWN
+        with st.expander("🔍 Detailed process breakdown", expanded=False):
+            st.markdown("**Step-by-step timeline:**")
+            current_time = 0
+            
+            st.write(f"Day 0: Start throwing ({throwing_total/60:.1f} hours)")
+            current_time += throwing_total/60
+            
+            if do_trimming:
+                st.write(f"Day {current_time/24:.1f}: Start trimming ({trimming_total/60:.1f} hours)")
+                current_time += trimming_total/60
+            
+            if handling_total > 0:
+                st.write(f"Day {current_time/24:.1f}: Handling work ({handling_total/60:.1f} hours)")
+                current_time += handling_total/60
+            
+            st.write(f"Day {current_time/24:.1f}: Final drying begins (12 hours)")
+            current_time += 12
+            
+            for load in range(kiln_loads_needed):
+                st.write(f"Day {current_time/24:.1f}: Bisque load {load+1} (1h load + 20h fire/cool)")
+                current_time += 21
+            
+            st.write(f"Day {current_time/24:.1f}: Start glazing ({glazing_total/60:.1f} hours)")
+            current_time += glazing_total/60
+            
+            for load in range(kiln_loads_needed):
+                st.write(f"Day {current_time/24:.1f}: Glaze load {load+1} (1h load + 92h fire/cool)")
+                current_time += 93
+            
+            st.write(f"**Day {current_time/24:.1f}: Order complete!**")
+        
+        # CAPACITY INSIGHTS
+        with st.expander("📊 Production insights", expanded=False):
+            pieces_per_hour = 60 / form_data["Throwing_min"]
+            weekly_capacity = pieces_per_hour * 40  # 40 hour work week
+            
+            st.write(f"• You can throw {pieces_per_hour:.1f} {selected_form.lower()} per hour")
+            st.write(f"• Weekly throwing capacity: ~{weekly_capacity:.0f} pieces")
+            st.write(f"• This order uses {(hands_on_hours + kiln_loading_hours)/40*100:.1f}% of a work week")
+            
+            if kiln_loads_needed > 1:
+                st.write(f"• Consider batching: {kiln_loads_needed} separate firings needed")
+            
+            bottleneck = max(
+                ("Throwing", throwing_total),
+                ("Trimming", trimming_total) if do_trimming else ("Trimming", 0),
+                ("Handling", handling_total),
+                ("Glazing", glazing_total)
+            )
+            
+            if bottleneck[1] > 0:
+                st.write(f"• Time bottleneck: {bottleneck[0]} takes {bottleneck[1]/60:.1f} hours")
+                
 # ------------ Labor and overhead ------------
-with tabs[4]:
+with tabs[5]:
     ip = ss.inputs
    
     st.subheader("Labor")
@@ -2176,7 +2425,7 @@ with tabs[4]:
     ip["pieces_per_month"] = st.number_input("Pieces per month", min_value=1, value=int(ip["pieces_per_month"]), step=10)
     
 # ------------ Pricing ------------
-with tabs[5]:
+with tabs[6]:
     ip = ss.inputs
     
 
@@ -2228,6 +2477,8 @@ with tabs[5]:
 
 
 # ---------------- Shipping & Tariffs (functionalized) ----------------
+with tabs[7]:
+    ip = ss.inputs
 with tabs[tab_titles.index("Shipping & Tariffs")]:
     import math
 
@@ -2405,7 +2656,7 @@ with tabs[tab_titles.index("Shipping & Tariffs")]:
     
 
 # ------------ Save and load ------------
-with tabs[6]:
+with tabs[7]:
     
     st.subheader("Save and load settings")
     state = dict(
@@ -2445,7 +2696,7 @@ with tabs[6]:
          
 
 # ------------ Report ------------
-with tabs[8]:
+with tabs[9]:
     ip = ss.inputs
     grams_pp = float(ss.get("recipe_grams_per_piece", 8.0))
     _, glaze_pp_from_recipe = glaze_per_piece_from_recipe(ss.catalog_df, ss.recipe_df, grams_pp)
@@ -2487,7 +2738,7 @@ with tabs[8]:
     st.caption("Glaze costs calculated from Catalog cost per lb/kg and recipe percents.")
 
 # ------------ About ------------
-with tabs[9]:
+with tabs[10]:
     
     st.subheader("About this app")
     st.markdown("""
