@@ -2433,10 +2433,10 @@ with tabs[4]:  # Production Planning tab
     available_forms = list(unified_forms["Form"]) if not unified_forms.empty else []
     
     selected_form = st.selectbox(
-        "Choose form type:",
-        ["None"] + available_forms + ["➕ Add New Form"],
-        help="Select from your unified form database or add a new form with timing"
-    )
+    "Choose form type:",
+    ["None", "➕ Add New Form"] + available_forms,
+    help="Select from your unified form database or add a new form with timing"
+)
     
     # ADD NEW FORM TO UNIFIED DATABASE
     if selected_form == "➕ Add New Form":
@@ -2538,7 +2538,7 @@ with tabs[4]:  # Production Planning tab
         bisque_fire_hours = 8
         bisque_cool_hours = 12
         glaze_fire_hours = 8
-        glaze_cool_hours = 84  # 3.5 days as requested
+        glaze_cool_hours = 24  # 1 day cool
         loading_hours_per_kiln = 1
         
         # Calculate total calendar time
@@ -2626,6 +2626,13 @@ with tabs[4]:  # Production Planning tab
     
     else:
         st.info("👆 Select a form above to see production planning and cost estimates.")
+
+# DETAILED BREAKDOWN (add this after the delivery estimate section)
+        with st.expander("🔍 Detailed process breakdown", expanded=False):
+            st.markdown("**Step-by-step timeline:**")
+            current_time = 0
+            
+            
                 
 # ------------ Labor and overhead ------------
 with tabs[5]:
@@ -2867,11 +2874,8 @@ with tabs[tab_titles.index("Shipping & Tariffs")]:
         render_international(sum_cols)
 
 
-
-    
-
 # ------------ Save and load ------------
-with tabs[8]:
+with tabs[7]:
     
     st.subheader("Save and load settings")
     state = dict(
