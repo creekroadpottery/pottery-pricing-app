@@ -1156,12 +1156,13 @@ tab_titles = [
     "Glaze Recipe",     # 2
     "Energy",           # 3
     "Production Planning",  # 4
-    "Labor and Overhead",   # 5
-    "Pricing",              # 6
-    "Save and Load",        # 7
-    "Shipping & Tariffs",   # 8
-    "Report",               # 9
-    "About",                # 10
+    "Kiln Load Planner",    # 5 
+    "Labor and Overhead",   # 6
+    "Pricing",              # 7
+    "Save and Load",        # 8
+    "Shipping & Tariffs",   # 9
+    "Report",               # 10
+    "About",                # 11
 ]
 tabs = st.tabs(tab_titles)
 
@@ -2632,10 +2633,241 @@ with tabs[4]:  # Production Planning tab
             st.markdown("**Step-by-step timeline:**")
             current_time = 0
             
+with tabs[5]:  # Kiln Load Planner
+    st.header("🔥 Kiln Load Planner")
+    st.markdown("**Plan your kiln loads with cost calculations**")
+    
+    # Initialize session state for kiln planning
+    if "kiln_shelves" not in ss:
+        ss.kiln_shelves = []
+    if "firing_type" not in ss:
+        ss.firing_type = "Bisque"
+    
+    # FIRING TYPE SELECTION
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        ss.firing_type = st.radio(
+            "Firing type:",
+            ["Bisque", "Glaze"],
+            horizontal=True,
+            key="kiln_firing_type",
+            help="Bisque allows tighter packing, Glaze needs spacing for glazes"
+        )
+    
+    with col2:
+        if ss.firing_type == "Bisque":
+            st.info("💡 **Bisque firing:** You can pack tighter, some pieces can tumble stack")
+        else:
+            st.warning("💡 **Glaze firing:** Leave space between pieces, no touching, use stilts")
+    
+    st.markdown("---")
+    
+    # SHELF MANAGEMENT
+    shelf_col1, shelf_col2 = st.columns([2, 1])
+    
+    with shelf_col1:
+        st.subheader("📚 Kiln Shelves")
+        
+        if st.button("➕ Add Shelf", key="add_shelf_btn"):
+            new_shelf = {
+                "shelf_id": len(ss.kiln_shelves),
+                "capacity": 12,  # Default capacity
+                "items": []  # List of {form, quantity} dicts
+            }
+            ss.kiln_shelves.append(new_shelf)
+            st.rerun()
+    
+    with shelf_col2:
+        if len(ss.kiln_shelves) > 0:
+            st.metric("Total Shelves", len(ss.kiln_shelves))
             
+            # Clear all shelves button
+            if st.button("🗑️ Clear All Shelves", key="clear_all_shelves"):
+                ss.kiln_shelves = []
+                st.rerun()
+    
+    # DISPLAY SHELVES
+    if not ss.kiln_shelves:
+        st.info("👆 Click 'Add Shelf' to start planning your kiln load")
+    else:
+        total_pieces = 0
+        all_items = []  # For cost calculation
+        
+        for i, shelf in enumerate(ss.kiln_shelves):
+            st.markdown(f"### Shelf {i+1}")
+            
+            shelf_setup_col, shelf_content_col, shelf_actions_col = st.columns([1, 2, 1])
+            
+            # SHELF CAPACITY
+            with shelf_setup_col:
+                shelf["capacity"] = st.number_input(
+                    f"Max pieces:",
+                    min_value=1,
+                    max_value=50,
+                    value=shelf["capacity"],
+                    step=1,
+                    key=f"shelf_{i}_capacity"
+                )
+                
+                # Remove shelf button
+                if st.button(f"🗑️ Remove", key=f"remove_shelf_{i}"):
+                    ss.kiln_shelves.pop(i)
+                    st.rerun()
+            
+            # ADD ITEMS TO SHELF
+            with shelf_content_col:
+                # Form selector - get available forms
+                unified_forms = ss.unified_forms.copy()
+                available_forms = list(unified_forms["Form"]) if not unified_forms.empty else []
+                
+                add_col1, add_col2, add_col3 = st.columns([2, 1, 1])
+                
+                with add_col1:
+                    selected_form = st.selectbox(
+                        "Add form:",
+                        ["Select form...", "➕ Custom Entry"] + available_forms,
+                        key=f"shelf_{i}_form_selector"
+                    )
+                
+                with add_col2:
+                    quantity = st.number_input(
+                        "Qty:",
+                        min_value=1,
+                        max_value=shelf["capacity"],
+                        value=1,
+                        key=f"shelf_{i}_quantity"
+                    )
+                
+                with add_col3:
+                    if st.button("Add", key=f"shelf_{i}_add_btn"):
+                        if selected_form not in ["Select form...", "➕ Custom Entry"]:
+                            # Check if there's room
+                            current_items = sum(item["quantity"] for item in shelf["items"])
+                            if current_items + quantity <= shelf["capacity"]:
+                                # Add to shelf
+                                shelf["items"].append({
+                                    "form": selected_form,
+                                    "quantity": quantity
+                                })
+                                st.rerun()
+                            else:
+                                st.error(f"Not enough space! Shelf capacity: {shelf['capacity']}, Current: {current_items}")
+                        elif selected_form == "➕ Custom Entry":
+                            # Handle custom entry
+                            st.info("💡 Enter custom form name in the selectbox above")
+                
+                # CURRENT SHELF CONTENTS
+                if shelf["items"]:
+                    st.markdown("**Current contents:**")
+                    shelf_total = 0
+                    for j, item in enumerate(shelf["items"]):
+                        item_col1, item_col2 = st.columns([3, 1])
+                        with item_col1:
+                            st.write(f"• {item['quantity']}× {item['form']}")
+                        with item_col2:
+                            if st.button("Remove", key=f"shelf_{i}_item_{j}_remove"):
+                                shelf["items"].pop(j)
+                                st.rerun()
+                        shelf_total += item["quantity"]
+                        total_pieces += item["quantity"]
+                        all_items.append(item)  # For cost calculation
+                else:
+                    st.caption("Empty shelf")
+                    shelf_total = 0
+            
+            # SHELF UTILIZATION
+            with shelf_actions_col:
+                utilization = (shelf_total / shelf["capacity"]) * 100 if shelf["capacity"] > 0 else 0
+                st.metric("Used", f"{shelf_total}/{shelf['capacity']}")
+                
+                # Visual utilization bar
+                if utilization > 90:
+                    st.progress(utilization/100, text=f"{utilization:.0f}% Full")
+                elif utilization > 70:
+                    st.progress(utilization/100, text=f"{utilization:.0f}% Good")
+                else:
+                    st.progress(utilization/100, text=f"{utilization:.0f}% Space")
+            
+            st.markdown("---")
+        
+        # KILN LOAD SUMMARY
+        if total_pieces > 0:
+            st.subheader("📊 Kiln Load Summary")
+            
+            summary_col1, summary_col2, summary_col3 = st.columns(3)
+            
+            with summary_col1:
+                st.metric("Total Pieces", total_pieces)
+                st.metric("Shelves Used", len([s for s in ss.kiln_shelves if s["items"]]))
+            
+            with summary_col2:
+                # Energy cost calculation
+                firing_type = ss.firing_type.lower()
+                if ss.inputs.get("fuel_gas", "Electric") == "Electric":
+                    if firing_type == "bisque":
+                        energy_per_firing = ss.inputs.get("kwh_bisque", 30.0) * ss.inputs.get("kwh_rate", 0.24)
+                    else:  # glaze
+                        energy_per_firing = ss.inputs.get("kwh_glaze", 35.0) * ss.inputs.get("kwh_rate", 0.24)
+                elif ss.inputs.get("fuel_gas", "Electric") == "Propane":
+                    if firing_type == "bisque":
+                        energy_per_firing = ss.inputs.get("lp_gal_bisque", 4.7) * ss.inputs.get("lp_price_per_gal", 3.50)
+                    else:  # glaze
+                        energy_per_firing = ss.inputs.get("lp_gal_glaze", 9.4) * ss.inputs.get("lp_price_per_gal", 3.50)
+                else:
+                    energy_per_firing = 25.0  # Default estimate
+                
+                energy_per_piece = energy_per_firing / max(1, total_pieces)
+                
+                st.metric("Energy Cost", money(energy_per_firing))
+                st.metric("Per Piece", money(energy_per_piece))
+            
+            with summary_col3:
+                # Firing time estimate
+                if firing_type == "bisque":
+                    firing_hours = 8 + 12  # fire + cool
+                else:  # glaze
+                    firing_hours = 8 + 24  # fire + cool
+                
+                st.metric("Firing Time", f"{firing_hours}h")
+                
+                # Efficiency rating
+                avg_utilization = sum((sum(item["quantity"] for item in shelf["items"]) / shelf["capacity"]) * 100 
+                                    for shelf in ss.kiln_shelves if shelf["items"]) / max(1, len([s for s in ss.kiln_shelves if s["items"]]))
+                
+                if avg_utilization > 85:
+                    efficiency = "🟢 Excellent"
+                elif avg_utilization > 70:
+                    efficiency = "🟡 Good"
+                else:
+                    efficiency = "🔴 Consider adding more"
+                
+                st.metric("Load Efficiency", f"{avg_utilization:.0f}%")
+                st.caption(efficiency)
+            
+            # DETAILED BREAKDOWN
+            with st.expander("🔍 Detailed breakdown", expanded=False):
+                st.markdown("**Items by type:**")
+                
+                # Group items by form
+                item_summary = {}
+                for item in all_items:
+                    form = item["form"]
+                    if form in item_summary:
+                        item_summary[form] += item["quantity"]
+                    else:
+                        item_summary[form] = item["quantity"]
+                
+                for form, total_qty in item_summary.items():
+                    st.write(f"• {total_qty}× {form}")
+                
+                st.markdown("**Energy cost breakdown:**")
+                fuel_type = ss.inputs.get("fuel_gas", "Electric")
+                st.write(f"• Fuel: {fuel_type}")
+                st.write(f"• {firing_type.title()} firing cost: {money(energy_per_firing)}")
+                st.write(f"• Cost per piece: {money(energy_per_piece)}")
                 
 # ------------ Labor and overhead ------------
-with tabs[5]:
+with tabs[6]:
     ip = ss.inputs
    
     st.subheader("Labor")
@@ -2647,7 +2879,7 @@ with tabs[5]:
     ip["pieces_per_month"] = st.number_input("Pieces per month", min_value=1, value=int(ip["pieces_per_month"]), step=10)
     
 # ------------ Pricing ------------
-with tabs[6]:
+with tabs[7]:
     ip = ss.inputs
     
 
@@ -2699,7 +2931,7 @@ with tabs[6]:
 
 
 # ---------------- Shipping & Tariffs (functionalized) ----------------
-with tabs[7]:
+with tabs[8]:
     ip = ss.inputs
 with tabs[tab_titles.index("Shipping & Tariffs")]:
     import math
@@ -2875,7 +3107,7 @@ with tabs[tab_titles.index("Shipping & Tariffs")]:
 
 
 # ------------ Save and load ------------
-with tabs[7]:
+with tabs[8]:
     
     st.subheader("Save and load settings")
     state = dict(
@@ -2965,7 +3197,7 @@ with tabs[7]:
          
 
 # ------------ Report ------------
-with tabs[9]:
+with tabs[10]:
     ip = ss.inputs
     grams_pp = float(ss.get("recipe_grams_per_piece", 8.0))
     _, glaze_pp_from_recipe = glaze_per_piece_from_recipe(ss.catalog_df, ss.recipe_df, grams_pp)
@@ -3007,7 +3239,7 @@ with tabs[9]:
     st.caption("Glaze costs calculated from Catalog cost per lb/kg and recipe percents.")
 
 # ------------ About ------------
-with tabs[10]:
+with tabs[11]:
     
     st.subheader("About this app")
     st.markdown("""
