@@ -3243,91 +3243,106 @@ with tabs[11]:
     
     st.subheader("About this app")
     st.markdown("""
-This app was created to help potters understand the true cost of their work.
-It began as a simple spreadsheet and grew into something I wanted to share.
-
-The project is guided by gratitude, generosity, and empathy.
-Gratitude for the teachers, friends, and makers who showed me the way.
-Generosity in making the tool free for anyone who might find it useful.
-Empathy for the many potters balancing time, resources, and creativity.
-
-Your numbers stay private while the app runs in your browser.
-When you save settings, a small JSON file is downloaded to your computer.
-No data is sent anywhere else.
-
-Alford Wayman
-Artist and owner
-Creek Road Pottery LLC
-
 # Pottery Cost Analysis App – User Guide
 
-This app was created to help potters understand the true costs behind every piece of work.  
-Each section focuses on one part of the making process, from clay weight to firing, glaze, overhead, and shipping.  
+This app was created to help potters understand the true costs behind every piece of work and run profitable pottery businesses. Each section focuses on one part of the complete pottery workflow, from initial pricing to kiln planning to international shipping.
 
 ---
 
-## 1. Per Unit
-- **Choose a form preset** (mugs, bowls, plates, etc.) to quickly load clay weights and glaze amounts.  
-- **Edit or upload presets** if you have your own standard forms.  
-- **Enter clay and packaging costs**, including bag price, bag weight, and clay used per piece.  
-- **Adjust for clay yield** (how much clay is lost to trimming or reclaim).  
-- **Use the shrink rate helper** to calculate shrink from wet to fired size.  
-- **Enter glaze data** from the recipe tab or manual inputs.  
-- **Add other project materials** (like cork lids or handles) for batch-specific costs.  
+## 1. Quick Start
+- **2-minute pricing**: Get wholesale and retail prices for any piece quickly
+- **Form presets**: Choose from 100+ pottery forms with clay weights and glaze amounts
+- **Smart defaults**: Sensible starting values for clay, energy, and labor costs
+- **Confidence scoring**: Visual feedback on estimate reliability
+- **Easy navigation**: Direct links to detailed tabs for customization
 
-The right side shows **total per-piece cost**.
+## 2. Per Unit
+- **Unified form management**: One database for clay weights, glaze amounts, timing data, and kiln info
+- **Form presets**: Choose from extensive library or create custom forms
+- **Clay costing**: Bag prices, yield calculations, and shrink rate helpers
+- **Advanced shrink tools**: Wet-to-fired calculations, lid remake helper with gallery height
+- **Glaze integration**: Connect to recipe tab or manual glaze costing
+- **Project materials**: Add one-time costs (handles, corks, special glazes)
+- Shows **complete per-piece cost breakdown**
+
+## 3. Glaze Recipe
+- **Material catalog**: Searchable database of 50+ common ceramic materials
+- **Recipe calculator**: Percentage-based glaze formulas with cost tracking
+- **Batch scaling**: Convert between grams, ounces, and pounds
+- **Per-piece costing**: Exact glaze cost for any quantity per piece
+- **Cost analysis**: See material costs, batch totals, and per-gram pricing
+
+## 4. Energy
+- **Multiple fuel types**: Electric, propane, natural gas, and wood firing
+- **Real usage data**: Based on actual potter energy consumption
+- **Firing cost breakdown**: Bisque, glaze, and third firings
+- **Kiln efficiency**: Calculate cost per piece for different firing methods
+- **Fuel comparison**: Compare energy costs across different kiln types
+
+## 5. Production Planning
+- **Order timeline**: Realistic delivery estimates with hands-on time and kiln schedules
+- **Form integration**: Uses unified form database with timing data
+- **Kiln scheduling**: Accounts for drying, firing, and cooling times
+- **Cost estimation**: Labor and material costs for complete orders
+- **Direct integration**: "Use in cost calculator" button applies data to pricing tabs
+
+## 6. Kiln Load Planner
+- **Visual kiln loading**: Plan shelf-by-shelf with capacity tracking
+- **Bisque vs glaze modes**: Different packing rules and guidance
+- **Dynamic shelves**: Add/remove shelves for any kiln size (wood, electric, gas)
+- **Cost optimization**: Real energy cost per piece for actual mixed loads
+- **Efficiency feedback**: Visual utilization and packing optimization
+- **Load summary**: Total pieces, energy costs, and firing time estimates
+
+## 7. Labor & Overhead
+- **Time tracking**: Hours per piece with realistic labor rates
+- **Overhead allocation**: Monthly expenses divided by production volume
+- **Cost per piece**: Accurate labor and overhead calculations
+
+## 8. Pricing
+- **Professional margins**: 2x2x2 rule or custom wholesale margins
+- **Market pricing**: Wholesale, retail, and distributor price points
+- **Profit analysis**: Clear cost vs. selling price breakdowns
+
+## 9. Save & Load
+- **Complete backup**: Download all settings, forms, and recipes as JSON
+- **Easy restore**: Upload saved settings to restore your complete setup
+- **Form management**: Export/import unified forms database as CSV
+- **Backward compatibility**: Automatically migrates old saved files
+
+## 10. Shipping & Tariffs
+- **Domestic shipping**: U.S. zones, dimensional weight, insurance calculations
+- **International selling**: Customs values, tariffs, VAT, and brokerage fees
+- **Pottery-specific**: Fragile item considerations and real shipping costs
+- **Landed cost**: Complete cost to deliver pottery internationally
+
+## 11. Report
+- **Quick summary**: All costs and pricing in one view
+- **Cost breakdown**: Material, energy, labor, and overhead details
+- **Pricing overview**: Wholesale, retail, and distributor prices
+- **Export ready**: Complete cost analysis for record-keeping
 
 ---
 
-## 2. Glaze Recipe
-- **Catalog table**: Enter raw materials and costs per lb/kg.  
-- **Recipe table**: Enter percentages for glaze formulas.  
-- **Batch converter**: Switch between grams, ounces, and pounds.  
-- See **grams/oz/lb needed, batch cost, and per-piece glaze cost**.  
+## Key Features
+
+**🔗 Unified Form System**: One database stores clay weights, glaze amounts, timing data, and kiln info. Enter once, use everywhere.
+
+**⚡ Real-Time Integration**: Production Planning connects to Cost Calculator. Kiln Load Planner calculates actual energy costs.
+
+**🌍 Complete Business Tool**: From raw clay costs to international shipping - everything needed to run a profitable pottery business.
+
+**💾 Data Persistence**: Save and restore complete setups. Never lose your custom forms, recipes, or cost data.
+
+**🎯 Potter-Focused**: Built by potters, for potters. Every feature addresses real studio workflows and business needs.
 
 ---
 
-## 3. Energy
-- Enter **electric kiln kWh rates and use**.  
-- Enter **fuel kiln data** (propane, natural gas, wood).  
-- Divide by pieces per firing.  
-Shows **per-piece energy cost**.
+This app was created with gratitude for the pottery community, generosity in sharing knowledge, and empathy for the challenges of running a creative business. Your data stays private in your browser - nothing is sent anywhere else.
 
----
-
-## 4. Labor & Overhead
-- **Labor**: Hourly rate × hours per piece.  
-- **Overhead**: Monthly expenses ÷ pieces per month.  
-Gives **labor and overhead per piece**.
-
----
-
-## 5. Pricing
-- **2x2x2 rule**: Materials → wholesale → retail → distributor.  
-- **Custom margins**: Set wholesale margin % and retail multipliers.  
-Outputs wholesale, retail, and distributor prices.
-
----
-
-## 6. Save & Load
-- **Download JSON**: Save your entire setup.  
-- **Upload JSON**: Reload saved setup.  
-- **Manage presets**: Import/export CSVs of clay weights & glaze amounts.  
-
----
-
-## 7. Report
-Quick snapshot of:  
-- Clay, glaze, packaging, other materials, energy, labor, overhead.  
-- Wholesale, retail, and distributor prices.  
-- Notes fuel choice & glaze method.  
-
----
-
-## 8. Shipping & Tariffs
-- **Domestic (U.S.)**: Weight, zone, service speed, insurance, handling time, dimensional weight.  
-- **International**: Customs value, FX rate, shipping cost. Toggle tariffs, VAT, brokerage.  
-Summary shows **weight, ship cost, tariffs/VAT, landed total**.
+**Alford Wayman**  
+Artist and Owner  
+Creek Road Pottery LLC
 
 ---
     """)
