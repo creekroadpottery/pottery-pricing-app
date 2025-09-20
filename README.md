@@ -60,8 +60,7 @@ Installation
 
 Clone the repository
 
-bash   git clone https://github.com/yourusername/pottery-pricing-app.git
-   cd pottery-pricing-app
+bash   git clone https://pottery-cost-analysis-app-e2dnvzfnfaqsu9hjnfvujd.streamlit.app/
 
 Install dependencies
 
