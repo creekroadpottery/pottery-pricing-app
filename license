@@ -1,0 +1,54 @@
+MIT License
+Copyright (c) 2024 Alford Wayman, Creek Road Pottery LLC
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+Additional Terms for Pottery Data
+While the software code is provided under the MIT License above, please note:
+Form Preset Data
+The pottery form presets included in this application (clay weights, glaze amounts, etc.) are provided as educational examples based on real pottery practice. These measurements may vary significantly based on:
+
+Individual throwing techniques
+Clay body characteristics
+Kiln and firing variations
+Regional pottery traditions
+
+Use these presets as starting points only. Always verify measurements and costs against your own pottery practice.
+Disclaimer for Business Use
+This software is designed to assist with pottery cost calculations, but:
+
+You are responsible for verifying all calculations
+Pottery costs vary widely by region, supplier, and technique
+The authors provide no warranty for business decisions made using this tool
+Always consult with experienced potters and business advisors for commercial applications
+
+Attribution (Optional but Appreciated)
+While not required by the MIT License, if you find this tool helpful, we'd appreciate:
+
+A mention of Creek Road Pottery in your pottery studio or website
+Sharing improvements back to the community via GitHub
+Recommending the tool to other potters who might benefit
+
+Contact for Pottery-Specific Questions
+For questions about pottery techniques, costing practices, or regional variations:
+
+GitHub Issues: Technical problems with the software
+Pottery Communities: Business and technique questions
+Local Pottery Guilds: Regional pricing and practice guidance
+
+The MIT License ensures this tool remains free and accessible to the pottery community while allowing potters to adapt it to their specific needs.
+
+This license reflects the values of gratitude, generosity, and empathy that guide this project.
